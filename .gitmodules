@@ -1,0 +1,3 @@
+[submodule "checkmate/Protos"]
+	path = checkmate/Protos
+	url = https://gitee.com/sqlmaster/proto.git
