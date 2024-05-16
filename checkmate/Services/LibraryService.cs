@@ -11,7 +11,7 @@ public class LibraryService(IDatabaseService databaseService) : Library.LibraryB
         await base.GetBooks(request, responseStream, context);
     }
 
-    public override async Task<UpdateResponse> AddBook(UpdateRequest request, ServerCallContext context)
+    public override async Task<UpdateResponse> AddBook(AddRequest request, ServerCallContext context)
     {
         return await base.AddBook(request, context);
     }
