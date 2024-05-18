@@ -6,7 +6,9 @@ namespace checkmate.Services;
 public class LibraryService(IDatabaseService databaseService) : Library.LibraryBase
 {
     private readonly IDatabaseService _db = databaseService;
-    public override async Task GetBooks(GetRequest request, IServerStreamWriter<GetBooksResponse> responseStream, ServerCallContext context)
+
+    public override async Task GetBooks(GetRequest request, IServerStreamWriter<GetBooksResponse> responseStream,
+        ServerCallContext context)
     {
         await base.GetBooks(request, responseStream, context);
     }
@@ -26,7 +28,8 @@ public class LibraryService(IDatabaseService databaseService) : Library.LibraryB
         return await base.DeleteBook(request, context);
     }
 
-    public override async Task GetReaders(GetRequest request, IServerStreamWriter<GetReadersResponse> responseStream, ServerCallContext context)
+    public override async Task GetReaders(GetRequest request, IServerStreamWriter<GetReadersResponse> responseStream,
+        ServerCallContext context)
     {
         await base.GetReaders(request, responseStream, context);
     }
@@ -46,7 +49,8 @@ public class LibraryService(IDatabaseService databaseService) : Library.LibraryB
         return await base.DeleteReader(request, context);
     }
 
-    public override async Task GetBorrows(GetRequest request, IServerStreamWriter<GetBorrowsResponse> responseStream, ServerCallContext context)
+    public override async Task GetBorrows(GetRequest request, IServerStreamWriter<GetBorrowsResponse> responseStream,
+        ServerCallContext context)
     {
         await base.GetBorrows(request, responseStream, context);
     }
