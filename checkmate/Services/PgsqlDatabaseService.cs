@@ -10,7 +10,7 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
     public PgsqlDatabaseService(IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection")!;
-        if (configuration == null)
+        if (connectionString == null)
         {
             throw new NullReferenceException("DefaultConnection");
         }
