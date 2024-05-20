@@ -42,41 +42,77 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
         }
 
         DataSource = NpgsqlDataSource.Create(connectionString);
+        _createTables();
+    }
 
+    private void _createTables()
+    {
         using var initBatch = DataSource.CreateBatch();
         var books = initBatch.CreateBatchCommand();
         initBatch.BatchCommands.Add(books);
         books.CommandText =
-            @"create table if not exists books(
-    id uuid primary key default gen_random_uuid(),
-    name varchar,
-    author varchar,
-    isbn varchar,
-    avatar_uri varchar,
-    stock integer
-)";
+            """
+            create table if not exists books(
+                id uuid primary key default gen_random_uuid(),
+                name varchar,
+                author varchar,
+                isbn varchar,
+                avatar_uri varchar,
+                stock integer
+            )
+            """;
         var reader = initBatch.CreateBatchCommand();
         reader.CommandText =
-            @"create table if not exists readers(
-    id uuid primary key default gen_random_uuid(),
-    name varchar,
-    avatar_uri varchar,
-    tier smallint,
-    creditability float
-)";
+            """
+            create table if not exists readers
+            (
+                id            uuid primary key default gen_random_uuid(),
+                name          varchar,
+                avatar_uri    varchar,
+                tier          smallint,
+                creditability float
+            )
+            """;
         initBatch.BatchCommands.Add(reader);
         var borrow = initBatch.CreateBatchCommand();
         borrow.CommandText =
-            @"create table if not exists borrows(
-    id uuid primary key default gen_random_uuid(),
-    reader_id uuid,
-    book_id uuid,
-    borrow_time timestamp,
-    return_time timestamp,
-    foreign key (reader_id) references readers(id),
-    foreign key (book_id) references books(id)
-)";
+            """
+            create table if not exists borrows
+            (
+                id          uuid primary key default gen_random_uuid(),
+                reader_id   uuid,
+                book_id     uuid,
+                borrow_time timestamp,
+                return_time timestamp,
+                foreign key (reader_id) references readers (id),
+                foreign key (book_id) references books (id)
+            )
+            """;
         initBatch.BatchCommands.Add(borrow);
+        var user = initBatch.CreateBatchCommand();
+        user.CommandText =
+            """
+            create table if not exists users
+            (
+                id            serial primary key,
+                device_name   varchar unique,
+                password_hash bytea
+            )
+            """;
+        initBatch.BatchCommands.Add(user);
+        var auth = initBatch.CreateBatchCommand();
+        auth.CommandText =
+            """
+            create table if not exists auth
+            (
+                id      serial primary key,
+                token   bytea,
+                os      varchar,
+                user_id serial,
+                foreign key (user_id) references users (id)
+            )
+        """;
+        initBatch.BatchCommands.Add(auth);
         initBatch.ExecuteNonQuery();
     }
 
