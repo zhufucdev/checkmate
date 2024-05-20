@@ -89,6 +89,32 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
             )
             """;
         initBatch.BatchCommands.Add(borrow);
+        var borrowBatch = initBatch.CreateBatchCommand();
+        borrowBatch.CommandText =
+            """
+            create table if not exists borrow_batches
+            (
+                id          uuid primary key default gen_random_uuid(),
+                reader_id   uuid,
+                borrow_time timestamp,
+                return_time timestamp,
+                foreign key (reader_id) references readers (id)
+            )
+            """;
+        initBatch.BatchCommands.Add(borrowBatch);
+        var bookBorrowBatch = initBatch.CreateBatchCommand();
+        bookBorrowBatch.CommandText =
+            """
+            create table if not exists book_borrow_batches
+            (
+                batch_id uuid,
+                book_id  uuid,
+                primary key (batch_id, book_id),
+                foreign key (batch_id) references borrow_batches (id),
+                foreign key (book_id) references books (id)
+            )
+            """;
+        initBatch.BatchCommands.Add(bookBorrowBatch);
         var user = initBatch.CreateBatchCommand();
         user.CommandText =
             """
@@ -103,15 +129,15 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
         var auth = initBatch.CreateBatchCommand();
         auth.CommandText =
             """
-            create table if not exists auth
-            (
-                id      serial primary key,
-                token   bytea,
-                os      varchar,
-                user_id serial,
-                foreign key (user_id) references users (id)
-            )
-        """;
+                create table if not exists auth
+                (
+                    id      serial primary key,
+                    token   bytea,
+                    os      varchar,
+                    user_id serial,
+                    foreign key (user_id) references users (id)
+                )
+            """;
         initBatch.BatchCommands.Add(auth);
         initBatch.ExecuteNonQuery();
     }
