@@ -71,4 +71,12 @@ public class AuthenticationService : Authentication.AuthenticationBase
             DeviceName = deviceName
         };
     }
+
+    public override async Task<AuthenticationResponse> Authenticate(AuthenticationReqeust request, ServerCallContext context)
+    {
+        return new AuthenticationResponse
+        {
+            Allowed = await _authenticator.GetUserIdFromToken(request.Token.ToByteArray()) != null
+        };
+    }
 }
