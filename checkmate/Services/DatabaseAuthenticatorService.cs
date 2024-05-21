@@ -28,6 +28,7 @@ public class DatabaseAuthenticatorService(IDatabaseService databaseService) : IA
         auth.Parameters.Add(databaseService.CreateParameter(token));
         auth.Parameters.Add(databaseService.CreateParameter(osName));
         auth.Parameters.Add(databaseService.CreateParameter(userId));
+        await auth.ExecuteNonQueryAsync();
         return token;
     }
 
