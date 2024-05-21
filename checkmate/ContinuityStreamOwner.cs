@@ -12,22 +12,12 @@ public class ContinuityStreamOwner<T> : IDisposable
     public ContinuityStreamOwner(T heartbeatPackage)
     {
         _heartbeatPackage = heartbeatPackage;
-        _heartbeatTimer = new Timer(_heartbeat, null, Timeout.Infinite, 30000);
+        _heartbeatTimer = new Timer(_heartbeat, null, 0, 30000);
     }
 
     private void _heartbeat(object? _)
     {
-        foreach (var writer in SuspendedWriters)
-        {
-            writer.WriteAsync(_heartbeatPackage)
-                .ContinueWith(t =>
-                {
-                    if (t.Exception != null)
-                    {
-                        Release(writer);
-                    }
-                });
-        }
+        WriteAsync(_heartbeatPackage);
     }
 
     public async Task Hold(IServerStreamWriter<T> writer)
