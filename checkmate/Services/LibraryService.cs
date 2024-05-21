@@ -456,8 +456,8 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
 
         await using var cmd = db.DataSource.CreateCommand(
             """
-            update borrows set (reader_id, book_id, borrow_time, return_time) = ($2, $3, $4, $5)
-            where id = $1
+            insert into borrows 
+            values ($1, $2, $3, $4, $5)
             """
         );
         _putBorrowIntoParameters(borrow, cmd);
