@@ -34,6 +34,7 @@ public class DatabaseAuthenticatorService(IDatabaseService databaseService) : IA
     public async Task<int?> GetUserIdFromToken(byte[] token)
     {
         await using var cmd = databaseService.DataSource.CreateCommand("select user_id from auth where token = $1");
+        cmd.Parameters.Add(databaseService.CreateParameter(token));
         return (int?)await cmd.ExecuteScalarAsync();
     }
 
