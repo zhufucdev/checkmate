@@ -58,7 +58,7 @@ public class ContinuityStreamOwner<T> : IDisposable
         );
     }
 
-    void IDisposable.Dispose()
+    public void Dispose()
     {
         foreach (var semaphore in _dict.Values)
         {

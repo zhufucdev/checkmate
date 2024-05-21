@@ -6,29 +6,11 @@ using Sqlmaster.Protobuf;
 
 namespace checkmate.Services;
 
-public class LibraryService(IDatabaseService db, IAuthenticatorService authenticator) : Library.LibraryBase
+public class LibraryService(
+    IDatabaseService db,
+    IAuthenticatorService authenticator,
+    ILibraryContinuityService continuity) : Library.LibraryBase
 {
-    private static readonly ContinuityStreamOwner<GetBooksResponse> BookContinuity = new(new GetBooksResponse
-    {
-        End = true
-    });
-
-    private static readonly ContinuityStreamOwner<GetBorrowsResponse> BorrowContinuity = new(new GetBorrowsResponse
-    {
-        End = true
-    });
-
-    private static readonly ContinuityStreamOwner<GetBorrowBatchesResponse> BorrowBatchContinuity = new(
-        new GetBorrowBatchesResponse
-        {
-            End = true
-        });
-
-    private static readonly ContinuityStreamOwner<GetReadersResponse> ReaderContinuity = new(new GetReadersResponse
-    {
-        End = true
-    });
-
     public override async Task GetBooks(GetRequest request, IServerStreamWriter<GetBooksResponse> responseStream,
         ServerCallContext context)
     {
@@ -57,7 +39,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         {
             End = true
         });
-        await BookContinuity.Hold(responseStream);
+        await continuity.Book.Hold(responseStream);
     }
 
     private void _putBookIntoParameters(DbCommand cmd, Book book)
@@ -94,7 +76,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         _putBookIntoParameters(cmd, book);
         await cmd.ExecuteNonQueryAsync();
 
-        await BookContinuity.WriteAsync(new GetBooksResponse
+        await continuity.Book.WriteAsync(new GetBooksResponse
         {
             End = false,
             Id = book.Id,
@@ -138,7 +120,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await BookContinuity.WriteAsync(new GetBooksResponse
+        await continuity.Book.WriteAsync(new GetBooksResponse
         {
             End = false,
             Id = book.Id,
@@ -172,7 +154,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await BookContinuity.WriteAsync(new GetBooksResponse
+        await continuity.Book.WriteAsync(new GetBooksResponse
         {
             End = false,
             Id = request.Id,
@@ -212,7 +194,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         {
             End = true
         });
-        await ReaderContinuity.Hold(responseStream);
+        await continuity.Reader.Hold(responseStream);
     }
 
     private void _putReaderIntoParameters(Reader reader, DbCommand cmd)
@@ -256,7 +238,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await ReaderContinuity.WriteAsync(new GetReadersResponse
+        await continuity.Reader.WriteAsync(new GetReadersResponse
         {
             End = false,
             Id = reader.Id,
@@ -289,7 +271,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         _putReaderIntoParameters(reader, cmd);
         await cmd.ExecuteNonQueryAsync();
 
-        await ReaderContinuity.WriteAsync(new GetReadersResponse
+        await continuity.Reader.WriteAsync(new GetReadersResponse
         {
             End = false,
             Id = reader.Id,
@@ -323,7 +305,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await ReaderContinuity.WriteAsync(new GetReadersResponse
+        await continuity.Reader.WriteAsync(new GetReadersResponse
         {
             End = false,
             Id = request.Id,
@@ -368,7 +350,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         {
             End = true
         });
-        await BorrowContinuity.Hold(responseStream);
+        await continuity.Borrow.Hold(responseStream);
     }
 
     private void _putBorrowIntoParameters(Borrow borrow, DbCommand cmd)
@@ -415,7 +397,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await BorrowContinuity.WriteAsync(new GetBorrowsResponse
+        await continuity.Borrow.WriteAsync(new GetBorrowsResponse
         {
             End = false,
             Id = borrow.Id,
@@ -460,7 +442,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await BorrowContinuity.WriteAsync(new GetBorrowsResponse
+        await continuity.Borrow.WriteAsync(new GetBorrowsResponse
         {
             End = false,
             Id = borrow.Id,
@@ -495,7 +477,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await BorrowContinuity.WriteAsync(new GetBorrowsResponse
+        await continuity.Borrow.WriteAsync(new GetBorrowsResponse
         {
             End = false,
             Id = request.Id,
@@ -560,7 +542,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         {
             End = true
         });
-        await BorrowBatchContinuity.Hold(responseStream);
+        await continuity.BorrowBatch.Hold(responseStream);
     }
 
     private void _putBorrowBatchIntoParameters(BorrowBatch batch, DbCommand cmd)
@@ -636,7 +618,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await BorrowBatchContinuity.WriteAsync(new GetBorrowBatchesResponse
+        await continuity.BorrowBatch.WriteAsync(new GetBorrowBatchesResponse
         {
             End = false,
             Id = request.Id,
@@ -690,7 +672,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
 
         await relational.ExecuteNonQueryAsync();
 
-        await BorrowBatchContinuity.WriteAsync(
+        await continuity.BorrowBatch.WriteAsync(
             new GetBorrowBatchesResponse
             {
                 End = false,
@@ -727,7 +709,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await BorrowBatchContinuity.WriteAsync(new GetBorrowBatchesResponse
+        await continuity.BorrowBatch.WriteAsync(new GetBorrowBatchesResponse
         {
             End = false,
             Id = request.Id,

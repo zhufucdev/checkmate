@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGrpc();
 builder.Services.AddSingleton<IDatabaseService, PgsqlDatabaseService>();
 builder.Services.AddSingleton<IAuthenticatorService, DatabaseAuthenticatorService>();
+builder.Services.AddSingleton<ILibraryContinuityService, LibraryContinuityService>();
 
 var app = builder.Build();
 
