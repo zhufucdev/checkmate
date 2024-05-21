@@ -347,21 +347,19 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            Timestamp? returnTime = null;
-            if (!await reader.IsDBNullAsync(5))
-            {
-                returnTime = Timestamp.FromDateTimeOffset(DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(5)));
-            }
-
             var borrow = new Borrow
             {
                 Id = reader.GetGuid(0).ToString(),
                 ReaderId = reader.GetGuid(1).ToString(),
                 BookId = reader.GetGuid(2).ToString(),
-                Time = Timestamp.FromDateTimeOffset(DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(3))),
-                DueTime = Timestamp.FromDateTimeOffset(DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(4))),
-                ReturnTime = returnTime
+                Time = Timestamp.FromDateTime(reader.GetDateTime(3).ToUniversalTime()),
+                DueTime = Timestamp.FromDateTime(reader.GetDateTime(4).ToUniversalTime()),
             };
+            if (!await reader.IsDBNullAsync(5))
+            {
+                borrow.ReturnTime = Timestamp.FromDateTime(reader.GetDateTime(5).ToUniversalTime());
+            }
+
             await responseStream.WriteAsync(new GetBorrowsResponse
             {
                 Id = borrow.Id,
@@ -548,20 +546,19 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            Timestamp? returnTime = null;
-            if (!await reader.IsDBNullAsync(5))
-            {
-                returnTime = Timestamp.FromDateTimeOffset(DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(5)));
-            }
-
             var batchId = reader.GetGuid(0);
             var batch = new BorrowBatch
             {
                 Id = batchId.ToString(),
                 ReaderId = reader.GetGuid(1).ToString(),
-                Time = Timestamp.FromDateTimeOffset(DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(2))),
-                ReturnTime = returnTime
+                Time = Timestamp.FromDateTime(reader.GetDateTime(2).ToUniversalTime()),
+                DueTime = Timestamp.FromDateTime(reader.GetDateTime(3).ToUniversalTime())
             };
+            if (!await reader.IsDBNullAsync(4))
+            {
+                batch.ReturnTime = Timestamp.FromDateTime(reader.GetDateTime(4).ToUniversalTime());
+            }
+
             foreach (var id in await _queryBatchedBookIds(batchId))
             {
                 batch.BookIds.Add(id.ToString());
