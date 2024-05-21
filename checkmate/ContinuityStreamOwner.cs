@@ -1,12 +1,27 @@
-using System.Collections.ObjectModel;
 using Grpc.Core;
 
 namespace checkmate;
 
-public class ContinuityStreamOwner<T>
+public class ContinuityStreamOwner<T> : IDisposable
 {
     private readonly Dictionary<IServerStreamWriter<T>, SemaphoreSlim> _dict = new();
     public IReadOnlyCollection<IServerStreamWriter<T>> SuspendedWriters => _dict.Keys;
+    private readonly Timer _heartbeatTimer;
+    private readonly T _heartbeatPackage;
+
+    public ContinuityStreamOwner(T heartbeatPackage)
+    {
+        _heartbeatPackage = heartbeatPackage;
+        _heartbeatTimer = new Timer(_heartbeat, null, Timeout.Infinite, 30000);
+    }
+
+    private void _heartbeat(object? _)
+    {
+        foreach (var writer in SuspendedWriters)
+        {
+            writer.WriteAsync(_heartbeatPackage);
+        }
+    }
 
     public async Task Hold(IServerStreamWriter<T> writer)
     {
@@ -21,5 +36,15 @@ public class ContinuityStreamOwner<T>
     public void Release(IServerStreamWriter<T> writer)
     {
         _dict[writer].Release();
+    }
+
+    void IDisposable.Dispose()
+    {
+        foreach (var semaphore in _dict.Values)
+        {
+            semaphore.Release();
+        }
+
+        _heartbeatTimer.Dispose();
     }
 }

@@ -8,10 +8,22 @@ namespace checkmate.Services;
 
 public class LibraryService(IDatabaseService db, IAuthenticatorService authenticator) : Library.LibraryBase
 {
-    private static readonly ContinuityStreamOwner<GetBooksResponse> BookContinuity = new();
-    private static readonly ContinuityStreamOwner<GetBorrowsResponse> BorrowContinuity = new();
-    private static readonly ContinuityStreamOwner<GetBorrowBatchesResponse> BorrowBatchContinuity = new();
-    private static readonly ContinuityStreamOwner<GetReadersResponse> ReaderContinuity = new();
+    private static readonly ContinuityStreamOwner<GetBooksResponse> BookContinuity = new(new GetBooksResponse
+    {
+        End = true
+    });
+    private static readonly ContinuityStreamOwner<GetBorrowsResponse> BorrowContinuity = new(new GetBorrowsResponse
+    {
+        End = true
+    });
+    private static readonly ContinuityStreamOwner<GetBorrowBatchesResponse> BorrowBatchContinuity = new(new GetBorrowBatchesResponse
+    {
+        End = true
+    });
+    private static readonly ContinuityStreamOwner<GetReadersResponse> ReaderContinuity = new(new GetReadersResponse
+    {
+        End = true
+    });
 
     public override async Task GetBooks(GetRequest request, IServerStreamWriter<GetBooksResponse> responseStream,
         ServerCallContext context)
