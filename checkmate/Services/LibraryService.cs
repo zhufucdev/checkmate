@@ -12,14 +12,18 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
     {
         End = true
     });
+
     private static readonly ContinuityStreamOwner<GetBorrowsResponse> BorrowContinuity = new(new GetBorrowsResponse
     {
         End = true
     });
-    private static readonly ContinuityStreamOwner<GetBorrowBatchesResponse> BorrowBatchContinuity = new(new GetBorrowBatchesResponse
-    {
-        End = true
-    });
+
+    private static readonly ContinuityStreamOwner<GetBorrowBatchesResponse> BorrowBatchContinuity = new(
+        new GetBorrowBatchesResponse
+        {
+            End = true
+        });
+
     private static readonly ContinuityStreamOwner<GetReadersResponse> ReaderContinuity = new(new GetReadersResponse
     {
         End = true
@@ -90,16 +94,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         _putBookIntoParameters(cmd, book);
         await cmd.ExecuteNonQueryAsync();
 
-        await Task.WhenAll(
-            BookContinuity.SuspendedWriters.Select(writer =>
-                writer.WriteAsync(new GetBooksResponse
-                {
-                    End = false,
-                    Id = book.Id,
-                    Book = book
-                })
-            )
-        );
+        await BookContinuity.WriteAsync(new GetBooksResponse
+        {
+            End = false,
+            Id = book.Id,
+            Book = book
+        });
 
         return new UpdateResponse
         {
@@ -138,16 +138,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await Task.WhenAll(
-            BookContinuity.SuspendedWriters.Select(writer =>
-                writer.WriteAsync(new GetBooksResponse
-                {
-                    End = false,
-                    Id = book.Id,
-                    Book = book
-                })
-            )
-        );
+        await BookContinuity.WriteAsync(new GetBooksResponse
+        {
+            End = false,
+            Id = book.Id,
+            Book = book
+        });
 
         return new UpdateResponse
         {
@@ -176,15 +172,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        foreach (var writer in BookContinuity.SuspendedWriters)
+        await BookContinuity.WriteAsync(new GetBooksResponse
         {
-            await writer.WriteAsync(new GetBooksResponse
-            {
-                End = false,
-                Id = request.Id,
-                Book = null
-            });
-        }
+            End = false,
+            Id = request.Id,
+            Book = null
+        });
 
         return new UpdateResponse
         {
@@ -263,16 +256,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await Task.WhenAll(
-            ReaderContinuity.SuspendedWriters.Select(writer =>
-                writer.WriteAsync(new GetReadersResponse
-                {
-                    End = false,
-                    Id = reader.Id,
-                    Reader = reader
-                })
-            )
-        );
+        await ReaderContinuity.WriteAsync(new GetReadersResponse
+        {
+            End = false,
+            Id = reader.Id,
+            Reader = reader
+        });
 
         return new UpdateResponse
         {
@@ -300,15 +289,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         _putReaderIntoParameters(reader, cmd);
         await cmd.ExecuteNonQueryAsync();
 
-        await Task.WhenAll(
-            ReaderContinuity.SuspendedWriters.Select(writer =>
-                writer.WriteAsync(new GetReadersResponse
-                {
-                    End = false,
-                    Id = reader.Id,
-                    Reader = reader
-                }))
-        );
+        await ReaderContinuity.WriteAsync(new GetReadersResponse
+        {
+            End = false,
+            Id = reader.Id,
+            Reader = reader
+        });
 
         return new UpdateResponse
         {
@@ -337,14 +323,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await Task.WhenAll(ReaderContinuity.SuspendedWriters.Select(writer =>
-            writer.WriteAsync(new GetReadersResponse
-            {
-                End = false,
-                Id = request.Id,
-                Reader = null
-            })
-        ));
+        await ReaderContinuity.WriteAsync(new GetReadersResponse
+        {
+            End = false,
+            Id = request.Id,
+            Reader = null
+        });
 
         return new UpdateResponse
         {
@@ -431,16 +415,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await Task.WhenAll(
-            BorrowContinuity.SuspendedWriters.Select(writer =>
-                writer.WriteAsync(new GetBorrowsResponse
-                {
-                    End = false,
-                    Id = borrow.Id,
-                    Borrow = borrow
-                })
-            )
-        );
+        await BorrowContinuity.WriteAsync(new GetBorrowsResponse
+        {
+            End = false,
+            Id = borrow.Id,
+            Borrow = borrow
+        });
 
         return new UpdateResponse
         {
@@ -480,16 +460,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await Task.WhenAll(
-            BorrowContinuity.SuspendedWriters.Select(writer =>
-                writer.WriteAsync(new GetBorrowsResponse
-                {
-                    End = false,
-                    Id = borrow.Id,
-                    Borrow = borrow
-                })
-            )
-        );
+        await BorrowContinuity.WriteAsync(new GetBorrowsResponse
+        {
+            End = false,
+            Id = borrow.Id,
+            Borrow = borrow
+        });
 
         return new UpdateResponse
         {
@@ -519,16 +495,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await Task.WhenAll(
-            BorrowContinuity.SuspendedWriters.Select(writer =>
-                writer.WriteAsync(new GetBorrowsResponse
-                {
-                    End = false,
-                    Id = request.Id,
-                    Borrow = null
-                })
-            )
-        );
+        await BorrowContinuity.WriteAsync(new GetBorrowsResponse
+        {
+            End = false,
+            Id = request.Id,
+            Borrow = null
+        });
 
         return new UpdateResponse
         {
@@ -664,16 +636,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await Task.WhenAll(
-            BorrowBatchContinuity.SuspendedWriters.Select(writer =>
-                writer.WriteAsync(new GetBorrowBatchesResponse
-                {
-                    End = false,
-                    Id = request.Id,
-                    Batch = batch
-                })
-            )
-        );
+        await BorrowBatchContinuity.WriteAsync(new GetBorrowBatchesResponse
+        {
+            End = false,
+            Id = request.Id,
+            Batch = batch
+        });
 
         return new UpdateResponse
         {
@@ -722,17 +690,13 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
 
         await relational.ExecuteNonQueryAsync();
 
-        await Task.WhenAll(
-            BorrowBatchContinuity.SuspendedWriters.Select(writer =>
-                writer.WriteAsync(
-                    new GetBorrowBatchesResponse
-                    {
-                        End = false,
-                        Id = batch.Id,
-                        Batch = batch
-                    }
-                )
-            )
+        await BorrowBatchContinuity.WriteAsync(
+            new GetBorrowBatchesResponse
+            {
+                End = false,
+                Id = batch.Id,
+                Batch = batch
+            }
         );
 
         return new UpdateResponse
@@ -763,16 +727,12 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
             };
         }
 
-        await Task.WhenAll(
-            BorrowBatchContinuity.SuspendedWriters.Select(writer =>
-                writer.WriteAsync(new GetBorrowBatchesResponse
-                {
-                    End = false,
-                    Id = request.Id,
-                    Batch = null
-                })
-            )
-        );
+        await BorrowBatchContinuity.WriteAsync(new GetBorrowBatchesResponse
+        {
+            End = false,
+            Id = request.Id,
+            Batch = null
+        });
 
         return new UpdateResponse
         {

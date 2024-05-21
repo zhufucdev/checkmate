@@ -19,7 +19,14 @@ public class ContinuityStreamOwner<T> : IDisposable
     {
         foreach (var writer in SuspendedWriters)
         {
-            writer.WriteAsync(_heartbeatPackage);
+            writer.WriteAsync(_heartbeatPackage)
+                .ContinueWith(t =>
+                {
+                    if (t.Exception != null)
+                    {
+                        Release(writer);
+                    }
+                });
         }
     }
 
@@ -36,6 +43,19 @@ public class ContinuityStreamOwner<T> : IDisposable
     public void Release(IServerStreamWriter<T> writer)
     {
         _dict[writer].Release();
+    }
+
+    public async Task WriteAsync(T message)
+    {
+        await Task.WhenAll(SuspendedWriters.Select(writer =>
+            writer.WriteAsync(message).ContinueWith(t =>
+            {
+                if (t.Exception != null)
+                {
+                    Release(writer);
+                }
+            }))
+        );
     }
 
     void IDisposable.Dispose()
