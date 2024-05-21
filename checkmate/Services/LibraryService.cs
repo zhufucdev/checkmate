@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.Data.Common;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
-using Microsoft.VisualBasic;
 using Sqlmaster.Protobuf;
 
 namespace checkmate.Services;
@@ -384,6 +383,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         cmd.Parameters.Add(db.CreateParameter(Guid.Parse(borrow.ReaderId)));
         cmd.Parameters.Add(db.CreateParameter(Guid.Parse(borrow.BookId)));
         cmd.Parameters.Add(db.CreateParameter(borrow.Time.ToDateTime()));
+        cmd.Parameters.Add(db.CreateParameter(borrow.DueTime.ToDateTime()));
         cmd.Parameters.Add(borrow.ReturnTime != null
             ? db.CreateParameter(borrow.ReturnTime.ToDateTime())
             : db.CreateParameter(DBNull.Value, "timestamp"));
@@ -457,7 +457,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         await using var cmd = db.DataSource.CreateCommand(
             """
             insert into borrows 
-            values ($1, $2, $3, $4, $5)
+            values ($1, $2, $3, $4, $5, $6)
             """
         );
         _putBorrowIntoParameters(borrow, cmd);
@@ -587,6 +587,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         cmd.Parameters.Add(db.CreateParameter(Guid.Parse(batch.Id)));
         cmd.Parameters.Add(db.CreateParameter(Guid.Parse(batch.ReaderId)));
         cmd.Parameters.Add(db.CreateParameter(batch.Time.ToDateTime()));
+        cmd.Parameters.Add(db.CreateParameter(batch.DueTime.ToDateTime()));
         cmd.Parameters.Add(
             batch.ReturnTime != null
                 ? db.CreateParameter(batch.ReturnTime.ToDateTime())
@@ -690,7 +691,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         await using var cmd = db.DataSource.CreateCommand(
             """
             insert into borrow_batches
-            values ($1, $2, $3, $4)
+            values ($1, $2, $3, $4, $5)
             """);
         _putBorrowBatchIntoParameters(batch, cmd);
         await cmd.ExecuteNonQueryAsync();

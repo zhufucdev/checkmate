@@ -85,6 +85,7 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
                 reader_id   uuid,
                 book_id     uuid,
                 borrow_time timestamp,
+                due_time    timestamp,
                 return_time timestamp,
                 foreign key (reader_id) references readers (id) on delete no action,
                 foreign key (book_id) references books (id) on delete no action
@@ -99,6 +100,7 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
                 id          uuid primary key default gen_random_uuid(),
                 reader_id   uuid,
                 borrow_time timestamp,
+                due_time    timestamp,
                 return_time timestamp,
                 foreign key (reader_id) references readers (id) on delete no action
             )
