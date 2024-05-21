@@ -1,6 +1,8 @@
+using System.Collections.ObjectModel;
 using System.Data.Common;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
+using Microsoft.VisualBasic;
 using Sqlmaster.Protobuf;
 
 namespace checkmate.Services;
@@ -77,15 +79,16 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         _putBookIntoParameters(cmd, book);
         await cmd.ExecuteNonQueryAsync();
 
-        foreach (var writer in BookContinuity.SuspendedWriters)
-        {
-            await writer.WriteAsync(new GetBooksResponse
-            {
-                End = false,
-                Id = book.Id,
-                Book = book
-            });
-        }
+        await Task.WhenAll(
+            BookContinuity.SuspendedWriters.Select(writer =>
+                writer.WriteAsync(new GetBooksResponse
+                {
+                    End = false,
+                    Id = book.Id,
+                    Book = book
+                })
+            )
+        );
 
         return new UpdateResponse
         {
@@ -123,16 +126,17 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
                 Effect = UpdateEffect.EffectNotFound
             };
         }
-        
-        foreach (var writer in BookContinuity.SuspendedWriters)
-        {
-            await writer.WriteAsync(new GetBooksResponse
-            {
-                End = false,
-                Id = book.Id,
-                Book = book
-            });
-        }
+
+        await Task.WhenAll(
+            BookContinuity.SuspendedWriters.Select(writer =>
+                writer.WriteAsync(new GetBooksResponse
+                {
+                    End = false,
+                    Id = book.Id,
+                    Book = book
+                })
+            )
+        );
 
         return new UpdateResponse
         {
@@ -160,7 +164,7 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
                 Effect = UpdateEffect.EffectNotFound
             };
         }
-        
+
         foreach (var writer in BookContinuity.SuspendedWriters)
         {
             await writer.WriteAsync(new GetBooksResponse
@@ -207,19 +211,134 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         await ReaderContinuity.Hold(responseStream);
     }
 
+    private void _putReaderIntoParameters(Reader reader, DbCommand cmd)
+    {
+        cmd.Parameters.Add(db.CreateParameter(Guid.Parse(reader.Id)));
+        cmd.Parameters.Add(db.CreateParameter(reader.Name));
+        cmd.Parameters.Add(db.CreateParameter(reader.AvatarUri));
+        cmd.Parameters.Add(db.CreateParameter((int)reader.Tier));
+        cmd.Parameters.Add(db.CreateParameter(reader.Creditability));
+    }
+
     public override async Task<UpdateResponse> UpdateReader(UpdateRequest request, ServerCallContext context)
     {
-        return await base.UpdateReader(request, context);
+        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        var reader = request.Reader;
+        if (reader == null)
+        {
+            throw new ArgumentNullException("reader");
+        }
+
+        await using var cmd = db.DataSource.CreateCommand(
+            """
+            update readers
+            set (name, avatar_uri, tier, creditability) = ($2, $3, $4, $5)
+            where id = $1
+            """);
+        _putReaderIntoParameters(reader, cmd);
+        var affected = await cmd.ExecuteNonQueryAsync();
+        if (affected <= 0)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectNotFound
+            };
+        }
+
+        await Task.WhenAll(
+            ReaderContinuity.SuspendedWriters.Select(writer =>
+                writer.WriteAsync(new GetReadersResponse
+                {
+                    End = false,
+                    Id = reader.Id,
+                    Reader = reader
+                })
+            )
+        );
+
+        return new UpdateResponse
+        {
+            Effect = UpdateEffect.EffectOk
+        };
     }
 
     public override async Task<UpdateResponse> AddReader(AddRequest request, ServerCallContext context)
     {
-        return await base.AddReader(request, context);
+        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        var reader = request.Reader;
+        if (reader == null)
+        {
+            throw new ArgumentNullException("reader");
+        }
+
+        await using var cmd = db.DataSource.CreateCommand("insert into readers values ($1, $2, $3, $4, $5)");
+        _putReaderIntoParameters(reader, cmd);
+        await cmd.ExecuteNonQueryAsync();
+
+        await Task.WhenAll(
+            ReaderContinuity.SuspendedWriters.Select(writer =>
+                writer.WriteAsync(new GetReadersResponse
+                {
+                    End = false,
+                    Id = reader.Id,
+                    Reader = reader
+                }))
+        );
+
+        return new UpdateResponse
+        {
+            Effect = UpdateEffect.EffectOk
+        };
     }
 
     public override async Task<UpdateResponse> DeleteReader(DeleteRequest request, ServerCallContext context)
     {
-        return await base.DeleteReader(request, context);
+        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        await using var cmd = db.DataSource.CreateCommand("delete from readers where id = $1");
+        cmd.Parameters.Add(db.CreateParameter(Guid.Parse(request.Id)));
+        var affected = await cmd.ExecuteNonQueryAsync();
+        if (affected <= 0)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectNotFound
+            };
+        }
+
+        await Task.WhenAll(ReaderContinuity.SuspendedWriters.Select(writer =>
+            writer.WriteAsync(new GetReadersResponse
+            {
+                End = false,
+                Id = request.Id,
+                Reader = null
+            })
+        ));
+
+        return new UpdateResponse
+        {
+            Effect = UpdateEffect.EffectOk
+        };
     }
 
     public override async Task GetBorrows(GetRequest request, IServerStreamWriter<GetBorrowsResponse> responseStream,
@@ -259,19 +378,167 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         await BorrowContinuity.Hold(responseStream);
     }
 
+    private void _putBorrowIntoParameters(Borrow borrow, DbCommand cmd)
+    {
+        cmd.Parameters.Add(db.CreateParameter(Guid.Parse(borrow.Id)));
+        cmd.Parameters.Add(db.CreateParameter(Guid.Parse(borrow.ReaderId)));
+        cmd.Parameters.Add(db.CreateParameter(Guid.Parse(borrow.BookId)));
+        cmd.Parameters.Add(db.CreateParameter(borrow.Time.ToDateTime()));
+        cmd.Parameters.Add(borrow.ReturnTime != null
+            ? db.CreateParameter(borrow.ReturnTime.ToDateTime())
+            : db.CreateParameter(DBNull.Value, "timestamp"));
+    }
+
     public override async Task<UpdateResponse> UpdateBorrow(UpdateRequest request, ServerCallContext context)
     {
-        return await base.UpdateBorrow(request, context);
+        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        var borrow = request.Borrow;
+        if (borrow == null)
+        {
+            throw new ArgumentNullException("borrow");
+        }
+
+        await using var cmd = db.DataSource.CreateCommand(
+            """
+            update borrows
+            set (reader_id, book_id, borrow_time, return_time) = ($2, $3, $4, $5)
+            where id = $1
+            """);
+        _putBorrowIntoParameters(borrow, cmd);
+        var affected = await cmd.ExecuteNonQueryAsync();
+        if (affected <= 0)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectNotFound
+            };
+        }
+
+        await Task.WhenAll(
+            BorrowContinuity.SuspendedWriters.Select(writer =>
+                writer.WriteAsync(new GetBorrowsResponse
+                {
+                    End = false,
+                    Id = borrow.Id,
+                    Borrow = borrow
+                })
+            )
+        );
+
+        return new UpdateResponse
+        {
+            Effect = UpdateEffect.EffectOk
+        };
     }
 
     public override async Task<UpdateResponse> AddBorrow(AddRequest request, ServerCallContext context)
     {
-        return await base.AddBorrow(request, context);
+        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        var borrow = request.Borrow;
+        if (borrow == null)
+        {
+            throw new ArgumentNullException("borrow");
+        }
+
+        await using var cmd = db.DataSource.CreateCommand(
+            """
+            update borrows set (reader_id, book_id, borrow_time, return_time) = ($2, $3, $4, $5)
+            where id = $1
+            """
+        );
+        _putBorrowIntoParameters(borrow, cmd);
+        var affected = await cmd.ExecuteNonQueryAsync();
+        if (affected <= 0)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectNotFound
+            };
+        }
+
+        await Task.WhenAll(
+            BorrowContinuity.SuspendedWriters.Select(writer =>
+                writer.WriteAsync(new GetBorrowsResponse
+                {
+                    End = false,
+                    Id = borrow.Id,
+                    Borrow = borrow
+                })
+            )
+        );
+
+        return new UpdateResponse
+        {
+            Effect = UpdateEffect.EffectOk
+        };
     }
 
     public override async Task<UpdateResponse> DeleteBorrow(DeleteRequest request, ServerCallContext context)
     {
-        return await base.DeleteBorrow(request, context);
+        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        await using var cmd = db.DataSource.CreateCommand("delete from borrows where id = $1");
+        cmd.Parameters.Add(db.CreateParameter(Guid.Parse(request.Id)));
+        var affected = await cmd.ExecuteNonQueryAsync();
+
+        if (affected <= 0)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectNotFound
+            };
+        }
+
+        await Task.WhenAll(
+            BorrowContinuity.SuspendedWriters.Select(writer =>
+                writer.WriteAsync(new GetBorrowsResponse
+                {
+                    End = false,
+                    Id = request.Id,
+                    Borrow = null
+                })
+            )
+        );
+
+        return new UpdateResponse
+        {
+            Effect = UpdateEffect.EffectOk
+        };
+    }
+
+    private async Task<Collection<Guid>> _queryBatchedBookIds(Guid batchId)
+    {
+        await using var queryBooks =
+            db.DataSource.CreateCommand("select book_id from book_borrow_batches where batch_id = $1");
+        queryBooks.Parameters.Add(db.CreateParameter(batchId));
+        await using var bookReader = await queryBooks.ExecuteReaderAsync();
+        Collection<Guid> result = [];
+        while (await bookReader.ReadAsync())
+        {
+            result.Add(bookReader.GetGuid(0));
+        }
+
+        return result;
     }
 
     public override async Task GetBorrowBatches(GetRequest request,
@@ -295,13 +562,9 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
                 Time = Timestamp.FromDateTimeOffset(DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(2))),
                 ReturnTime = returnTime
             };
-            await using var queryBooks =
-                db.DataSource.CreateCommand("select book_id from book_borrow_batches where batch_id = $1");
-            queryBooks.Parameters.Add(db.CreateParameter(batchId));
-            await using var bookReader = await queryBooks.ExecuteReaderAsync();
-            while (await bookReader.ReadAsync())
+            foreach (var id in await _queryBatchedBookIds(batchId))
             {
-                batch.BookIds.Add(bookReader.GetGuid(0).ToString());
+                batch.BookIds.Add(id.ToString());
             }
 
             await responseStream.WriteAsync(new GetBorrowBatchesResponse
@@ -319,18 +582,191 @@ public class LibraryService(IDatabaseService db, IAuthenticatorService authentic
         await BorrowBatchContinuity.Hold(responseStream);
     }
 
+    private void _putBorrowBatchIntoParameters(BorrowBatch batch, DbCommand cmd)
+    {
+        cmd.Parameters.Add(db.CreateParameter(Guid.Parse(batch.Id)));
+        cmd.Parameters.Add(db.CreateParameter(Guid.Parse(batch.ReaderId)));
+        cmd.Parameters.Add(db.CreateParameter(batch.Time.ToDateTime()));
+        cmd.Parameters.Add(
+            batch.ReturnTime != null
+                ? db.CreateParameter(batch.ReturnTime.ToDateTime())
+                : db.CreateParameter(DBNull.Value, "timestamp"));
+    }
+
     public override async Task<UpdateResponse> UpdateBorrowBatch(UpdateRequest request, ServerCallContext context)
     {
-        return await base.UpdateBorrowBatch(request, context);
+        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        var batch = request.Batch;
+        if (batch == null)
+        {
+            throw new ArgumentNullException("batch");
+        }
+
+        var batchId = Guid.Parse(request.Id);
+        var originalIds = await _queryBatchedBookIds(batchId);
+        if (!batch.BookIds.ToHashSet().SetEquals(originalIds.Select(guid => guid.ToString()).AsEnumerable()))
+        {
+            // update the relational table
+            await using var removal =
+                db.DataSource.CreateCommand("delete from book_borrow_batches where batch_id = $1");
+            removal.Parameters.Add(db.CreateParameter(batchId));
+            await removal.ExecuteNonQueryAsync();
+
+            await using var construct = db.DataSource.CreateBatch();
+            foreach (var id in batch.BookIds)
+            {
+                var item = construct.CreateBatchCommand();
+                item.CommandText =
+                    """
+                        insert into book_borrow_batches
+                        values($1, $2)
+                    """;
+                item.Parameters.Add(db.CreateParameter(batchId));
+                item.Parameters.Add(db.CreateParameter(Guid.Parse(id)));
+                construct.BatchCommands.Add(item);
+            }
+
+            await construct.ExecuteNonQueryAsync();
+        }
+
+        await using var cmd =
+            db.DataSource.CreateCommand(
+                """
+                update borrow_batches
+                set (reader_id, borrow_time, return_time) = ($2, $3, $4)
+                where id = $1
+                """);
+        _putBorrowBatchIntoParameters(batch, cmd);
+
+        var affected = await cmd.ExecuteNonQueryAsync();
+        if (affected <= 0)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectNotFound
+            };
+        }
+
+        await Task.WhenAll(
+            BorrowBatchContinuity.SuspendedWriters.Select(writer =>
+                writer.WriteAsync(new GetBorrowBatchesResponse
+                {
+                    End = false,
+                    Id = request.Id,
+                    Batch = batch
+                })
+            )
+        );
+
+        return new UpdateResponse
+        {
+            Effect = UpdateEffect.EffectOk
+        };
     }
 
     public override async Task<UpdateResponse> AddBorrowBatch(AddRequest request, ServerCallContext context)
     {
-        return await base.AddBorrowBatch(request, context);
+        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        var batch = request.Batch;
+        if (batch == null)
+        {
+            throw new ArgumentNullException("batch");
+        }
+
+        await using var cmd = db.DataSource.CreateCommand(
+            """
+            insert into borrow_batches
+            values ($1, $2, $3, $4)
+            """);
+        _putBorrowBatchIntoParameters(batch, cmd);
+        await cmd.ExecuteNonQueryAsync();
+
+        var batchId = Guid.Parse(batch.Id);
+        await using var relational = db.DataSource.CreateBatch();
+        foreach (var bookId in batch.BookIds)
+        {
+            var makeOne = relational.CreateBatchCommand();
+            makeOne.CommandText =
+                """
+                insert into book_borrow_batches
+                values ($1, $2)
+                """;
+            makeOne.Parameters.Add(db.CreateParameter(batchId));
+            makeOne.Parameters.Add(db.CreateParameter(Guid.Parse(bookId)));
+            relational.BatchCommands.Add(makeOne);
+        }
+
+        await relational.ExecuteNonQueryAsync();
+
+        await Task.WhenAll(
+            BorrowBatchContinuity.SuspendedWriters.Select(writer =>
+                writer.WriteAsync(
+                    new GetBorrowBatchesResponse
+                    {
+                        End = false,
+                        Id = batch.Id,
+                        Batch = batch
+                    }
+                )
+            )
+        );
+
+        return new UpdateResponse
+        {
+            Effect = UpdateEffect.EffectOk
+        };
     }
 
     public override async Task<UpdateResponse> DeleteBorrowBatch(DeleteRequest request, ServerCallContext context)
     {
-        return await base.DeleteBorrowBatch(request, context);
+        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        await using var cmd = db.DataSource.CreateCommand("delete from borrow_batches where id = $1");
+        cmd.Parameters.Add(db.CreateParameter(Guid.Parse(request.Id)));
+
+        var affected = await cmd.ExecuteNonQueryAsync();
+        if (affected <= 0)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectNotFound
+            };
+        }
+
+        await Task.WhenAll(
+            BorrowBatchContinuity.SuspendedWriters.Select(writer =>
+                writer.WriteAsync(new GetBorrowBatchesResponse
+                {
+                    End = false,
+                    Id = request.Id,
+                    Batch = null
+                })
+            )
+        );
+
+        return new UpdateResponse
+        {
+            Effect = UpdateEffect.EffectOk
+        };
     }
 }

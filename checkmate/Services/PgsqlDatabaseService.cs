@@ -1,5 +1,7 @@
+using System.Data;
 using System.Data.Common;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace checkmate.Services;
 
@@ -84,8 +86,8 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
                 book_id     uuid,
                 borrow_time timestamp,
                 return_time timestamp,
-                foreign key (reader_id) references readers (id),
-                foreign key (book_id) references books (id)
+                foreign key (reader_id) references readers (id) on delete no action,
+                foreign key (book_id) references books (id) on delete no action
             )
             """;
         initBatch.BatchCommands.Add(borrow);
@@ -98,7 +100,7 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
                 reader_id   uuid,
                 borrow_time timestamp,
                 return_time timestamp,
-                foreign key (reader_id) references readers (id)
+                foreign key (reader_id) references readers (id) on delete no action
             )
             """;
         initBatch.BatchCommands.Add(borrowBatch);
@@ -110,7 +112,7 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
                 batch_id uuid,
                 book_id  uuid,
                 primary key (batch_id, book_id),
-                foreign key (batch_id) references borrow_batches (id),
+                foreign key (batch_id) references borrow_batches (id) on delete cascade,
                 foreign key (book_id) references books (id)
             )
             """;
@@ -129,24 +131,25 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
         var auth = initBatch.CreateBatchCommand();
         auth.CommandText =
             """
-                create table if not exists auth
-                (
-                    id      serial primary key,
-                    token   bytea,
-                    os      varchar,
-                    user_id serial,
-                    foreign key (user_id) references users (id)
-                )
+            create table if not exists auth
+            (
+                id      serial primary key,
+                token   bytea,
+                os      varchar,
+                user_id serial,
+                foreign key (user_id) references users (id) on delete cascade
+            )
             """;
         initBatch.BatchCommands.Add(auth);
         initBatch.ExecuteNonQuery();
     }
 
-    public DbParameter CreateParameter(object? value)
+    public DbParameter CreateParameter(object? value, string? typeName = null)
     {
         return new NpgsqlParameter
         {
-            Value = value
+            Value = value,
+            DataTypeName = typeName
         };
     }
 
