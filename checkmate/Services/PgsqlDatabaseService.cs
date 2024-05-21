@@ -142,7 +142,7 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
         initBatch.ExecuteNonQuery();
     }
 
-    public DbParameter CreateParameter(object value)
+    public DbParameter CreateParameter(object? value)
     {
         return new NpgsqlParameter
         {

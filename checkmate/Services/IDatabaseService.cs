@@ -6,5 +6,5 @@ namespace checkmate.Services;
 public interface IDatabaseService : IDisposable
 {
     DbDataSource DataSource { get; }
-    DbParameter CreateParameter(object value);
+    DbParameter CreateParameter(object? value);
 }
