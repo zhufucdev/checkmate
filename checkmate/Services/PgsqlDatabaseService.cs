@@ -1,7 +1,5 @@
-using System.Data;
 using System.Data.Common;
 using Npgsql;
-using NpgsqlTypes;
 
 namespace checkmate.Services;
 
