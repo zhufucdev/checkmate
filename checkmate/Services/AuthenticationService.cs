@@ -72,7 +72,7 @@ public class AuthenticationService : Authentication.AuthenticationBase
         };
     }
 
-    public override async Task<AuthenticationResponse> Authenticate(AuthenticationReqeust request, ServerCallContext context)
+    public override async Task<AuthenticationResponse> Authenticate(AuthenticationRequest request, ServerCallContext context)
     {
         return new AuthenticationResponse
         {
