@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
+using checkmate.Services.Grpc;
 
-namespace checkmate.Services;
+namespace checkmate.Services.Impl;
 
 public class DatabaseAuthenticatorService(IDatabaseService databaseService) : IAuthenticatorService
 {

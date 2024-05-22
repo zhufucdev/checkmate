@@ -4,7 +4,7 @@ using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Sqlmaster.Protobuf;
 
-namespace checkmate.Services;
+namespace checkmate.Services.Grpc;
 
 public class LibraryService(
     IDatabaseService db,

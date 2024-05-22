@@ -3,14 +3,14 @@ using Google.Protobuf;
 using Grpc.Core;
 using Sqlmaster.Protobuf;
 
-namespace checkmate.Services;
+namespace checkmate.Services.Grpc;
 
 public class AuthenticationService : Authentication.AuthenticationBase
 {
     private const int TokenLength = 24;
     private readonly IAuthenticatorService _authenticator;
     private readonly ILogger _logger;
-    private static string? _temporaryPassword;
+    private static readonly ICollection<string?> TemporaryPassword = [];
 
     public AuthenticationService(
         IAuthenticatorService authenticatorService,
@@ -20,11 +20,12 @@ public class AuthenticationService : Authentication.AuthenticationBase
         _authenticator = authenticatorService;
         _logger = logger;
 
-        if (_temporaryPassword != null) return;
+        if (TemporaryPassword.Count > 0) return;
         var anyUser = databaseService.DataSource.CreateCommand("select id from users").ExecuteScalar();
         if (anyUser != null) return;
-        _temporaryPassword = RandomNumberGenerator.GetHexString(TokenLength);
-        logger.LogWarning($"No user present in database. Temporary password generated: {_temporaryPassword}");
+        var pwdGen = RandomNumberGenerator.GetHexString(TokenLength);
+        TemporaryPassword.Add(pwdGen);
+        logger.LogWarning($"No user present in database. Temporary password generated: {pwdGen}");
     }
 
     public override async Task<AuthorizationResponse> Authorize(AuthorizationRequest request, ServerCallContext context)
@@ -32,7 +33,7 @@ public class AuthenticationService : Authentication.AuthenticationBase
         var userId = await _authenticator.GetUserIdOrNull(request.Password, request.DeviceName);
         if (userId == null)
         {
-            if (_temporaryPassword != null && request.Password == _temporaryPassword)
+            if (TemporaryPassword.Contains(request.Password))
             {
                 userId = await _authenticator.AddToUser(request.Password, request.DeviceName);
             }
@@ -78,5 +79,10 @@ public class AuthenticationService : Authentication.AuthenticationBase
         {
             Allowed = await _authenticator.GetUserIdFromToken(request.Token.ToByteArray()) != null
         };
+    }
+
+    public override async Task AddUser(AddUserRequest request, IServerStreamWriter<AddUserResponse> responseStream, ServerCallContext context)
+    {
+        
     }
 }

@@ -1,7 +1,7 @@
 using System.Data.Common;
 using Npgsql;
 
-namespace checkmate.Services;
+namespace checkmate.Services.Impl;
 
 public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
 {

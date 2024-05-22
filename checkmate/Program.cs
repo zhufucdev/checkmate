@@ -1,4 +1,6 @@
 using checkmate.Services;
+using checkmate.Services.Grpc;
+using checkmate.Services.Impl;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -6,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGrpc();
 builder.Services.AddSingleton<IDatabaseService, PgsqlDatabaseService>();
 builder.Services.AddSingleton<IAuthenticatorService, DatabaseAuthenticatorService>();
-builder.Services.AddSingleton<ILibraryContinuityService, LibraryContinuityService>();
+builder.Services.AddSingleton<ILibraryContinuityService, LibraryContinuityImpl>();
 
 var app = builder.Build();
 

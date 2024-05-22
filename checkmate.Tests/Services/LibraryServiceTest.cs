@@ -1,4 +1,5 @@
 using checkmate.Services;
+using checkmate.Services.Grpc;
 using JetBrains.Annotations;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 

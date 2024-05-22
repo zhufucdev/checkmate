@@ -1,8 +1,8 @@
 using Sqlmaster.Protobuf;
 
-namespace checkmate.Services;
+namespace checkmate.Services.Impl;
 
-public class LibraryContinuityService : ILibraryContinuityService
+public class LibraryContinuityImpl : ILibraryContinuityService
 {
     public void Dispose()
     {
