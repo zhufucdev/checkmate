@@ -109,8 +109,7 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
                 batch_id uuid,
                 book_id  uuid,
                 primary key (batch_id, book_id),
-                foreign key (batch_id) references borrow_batches (id) on delete cascade,
-                foreign key (book_id) references books (id)
+                foreign key (batch_id) references borrow_batches (id) on delete cascade
             )
             """;
         initBatch.BatchCommands.Add(bookBorrowBatch);
