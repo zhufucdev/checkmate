@@ -120,7 +120,9 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
             (
                 id            serial primary key,
                 device_name   varchar unique,
-                password_hash bytea
+                password_hash bytea,
+                role          smallint,
+                reader_id     uuid references readers (id) on delete set null
             )
             """;
         initBatch.BatchCommands.Add(user);
@@ -130,7 +132,7 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
             create table if not exists auth
             (
                 id      serial primary key,
-                token   bytea,
+                token   bytea unique,
                 os      varchar,
                 user_id serial,
                 foreign key (user_id) references users (id) on delete cascade

@@ -8,8 +8,9 @@ namespace checkmate.Services.Grpc;
 
 public class LibraryService(
     IDatabaseService db,
-    IAuthenticatorService authenticator,
-    ILibraryContinuityService continuity) : Library.LibraryBase
+    IAccountService accounts,
+    ILibraryContinuityService continuity,
+    ITemporaryPasswordService creation) : Library.LibraryBase
 {
     public override async Task GetBooks(GetRequest request, IServerStreamWriter<GetBooksResponse> responseStream,
         ServerCallContext context)
@@ -54,7 +55,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> AddBook(AddRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -91,7 +92,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> UpdateBook(UpdateRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -135,7 +136,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> DeleteBook(DeleteRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -208,7 +209,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> UpdateReader(UpdateRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -253,7 +254,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> AddReader(AddRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -286,7 +287,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> DeleteReader(DeleteRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -367,7 +368,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> UpdateBorrow(UpdateRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -412,7 +413,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> AddBorrow(AddRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -457,7 +458,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> DeleteBorrow(DeleteRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -559,7 +560,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> UpdateBorrowBatch(UpdateRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -633,7 +634,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> AddBorrowBatch(AddRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -689,7 +690,7 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> DeleteBorrowBatch(DeleteRequest request, ServerCallContext context)
     {
-        if (await authenticator.GetUserIdFromToken(request.Token.ToByteArray()) == null)
+        if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
         {
             return new UpdateResponse
             {
@@ -715,6 +716,116 @@ public class LibraryService(
             Id = request.Id,
             Batch = null
         });
+
+        return new UpdateResponse
+        {
+            Effect = UpdateEffect.EffectOk
+        };
+    }
+
+
+    private const int TimedPasswordLife = 30;
+
+    public override async Task AddUser(AddUserRequest request, IServerStreamWriter<AddUserResponse> responseStream,
+        ServerCallContext context)
+    {
+        while (true)
+        {
+            var sender = await accounts.GetUserOrNull(request.Password, request.DeviceName);
+            if (sender == null)
+            {
+                await responseStream.WriteAsync(new AddUserResponse
+                {
+                    Allowed = false
+                });
+                break;
+            }
+
+            var password = creation.AddTimedPassword(lifeSpanSeconds: TimedPasswordLife);
+            password.Tag = request.Role;
+            try
+            {
+                await responseStream.WriteAsync(new AddUserResponse
+                {
+                    Allowed = true,
+                    LifeSpanSeconds = TimedPasswordLife,
+                    TemporaryPassword = password.Value
+                });
+            }
+            catch (Exception)
+            {
+                break;
+            }
+
+            await password.ToBeInvalid();
+        }
+    }
+
+    public override async Task GetUsers(GetRequest request, IServerStreamWriter<GetUsersResponse> responseStream,
+        ServerCallContext context)
+    {
+        var sender = await accounts.GetUserFromToken(request.Token.ToByteArray());
+        if (sender is not { Role: UserRole.RoleAdmin })
+        {
+            await responseStream.WriteAsync(new GetUsersResponse
+            {
+                End = true
+            });
+            return;
+        }
+
+        await foreach (var user in accounts.GetUsers())
+        {
+            await responseStream.WriteAsync(new GetUsersResponse
+            {
+                End = false,
+                Id = user.Id,
+                User = user
+            });
+        }
+
+        await responseStream.WriteAsync(new GetUsersResponse
+        {
+            End = true
+        });
+
+        await continuity.User.Hold(responseStream);
+    }
+
+    public override async Task<UpdateResponse> UpdateUser(UpdateUserRequest request, ServerCallContext context)
+    {
+        var adminId = await accounts.GetUserIdFromToken(request.Token.ToByteArray());
+        if (adminId == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+        
+        if (request.User != null)
+        {
+            var found = await accounts.UpdateUser(request.UserId, request.User);
+            if (!found)
+            {
+                return new UpdateResponse
+                {
+                    Effect = UpdateEffect.EffectNotFound
+                };
+            }
+        }
+
+        if (request.HasChangePassword)
+        {
+            var found = await accounts.UpdatePassword(request.UserId, request.ChangePassword);
+            if (!found)
+            {
+                return new UpdateResponse
+                {
+                    Effect = UpdateEffect.EffectNotFound
+                };
+            }
+        }
 
         return new UpdateResponse
         {

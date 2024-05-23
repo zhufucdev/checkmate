@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Google.Protobuf;
 using Grpc.Core;
 using Sqlmaster.Protobuf;
@@ -7,35 +6,42 @@ namespace checkmate.Services.Grpc;
 
 public class AuthenticationService : Authentication.AuthenticationBase
 {
-    private const int TokenLength = 24;
-    private readonly IAuthenticatorService _authenticator;
+    private readonly IAccountService _account;
     private readonly ILogger _logger;
-    private static readonly ICollection<string?> TemporaryPassword = [];
+    private readonly ITemporaryPasswordService _creation;
 
     public AuthenticationService(
-        IAuthenticatorService authenticatorService,
+        IAccountService accountService,
         IDatabaseService databaseService,
+        ITemporaryPasswordService creation,
         ILogger<AuthenticationService> logger)
     {
-        _authenticator = authenticatorService;
+        _account = accountService;
         _logger = logger;
+        _creation = creation;
 
-        if (TemporaryPassword.Count > 0) return;
+        if (creation.TemporaryPasswords.Count > 0) return;
         var anyUser = databaseService.DataSource.CreateCommand("select id from users").ExecuteScalar();
         if (anyUser != null) return;
-        var pwdGen = RandomNumberGenerator.GetHexString(TokenLength);
-        TemporaryPassword.Add(pwdGen);
-        logger.LogWarning($"No user present in database. Temporary password generated: {pwdGen}");
+        var pwdGen = creation.AddOneUsePassword();
+        pwdGen.Tag = new IAccountService.UserCreator(pwdGen.Value, null, UserRole.RoleAdmin, null);
+        logger.LogWarning($"No user present in database. Temporary password generated: {pwdGen.Value}");
     }
 
     public override async Task<AuthorizationResponse> Authorize(AuthorizationRequest request, ServerCallContext context)
     {
-        var userId = await _authenticator.GetUserIdOrNull(request.Password, request.DeviceName);
+        var userId = (await _account.GetUserOrNull(request.Password, request.DeviceName))?.Id;
         if (userId == null)
         {
-            if (TemporaryPassword.Contains(request.Password))
+            var pwd = _creation.GetValidPassword(request.Password);
+            if (pwd != null)
             {
-                userId = await _authenticator.AddToUser(request.Password, request.DeviceName);
+                pwd.Invalidate();
+                var model = pwd.Tag as IAccountService.UserCreator;
+                userId = await _account.AddUser(new IAccountService.UserCreator(model?.Password ?? request.Password,
+                    model?.DeviceName ?? request.DeviceName, model?.Role ?? UserRole.RoleLibrarian, model?.ReaderId));
+                _logger.LogInformation(
+                    $"New user ({request.DeviceName}) was created via access with temporary password.");
             }
             else
             {
@@ -46,7 +52,7 @@ public class AuthenticationService : Authentication.AuthenticationBase
             }
         }
 
-        var token = await _authenticator.AddToAuth(request.Os, userId.Value);
+        var token = await _account.BeginSession(request.Os, userId.Value);
         return new AuthorizationResponse
         {
             Allowed = true,
@@ -56,33 +62,46 @@ public class AuthenticationService : Authentication.AuthenticationBase
 
     public override async Task<RevokeTokenResponse> Revoke(RevokeTokenRequest request, ServerCallContext context)
     {
-        var id = await _authenticator.GetUserIdFromToken(request.Token.ToByteArray());
+        var id = await _account.GetUserIdFromToken(request.Token.ToByteArray());
         if (id == null)
         {
             return new RevokeTokenResponse
             {
+                Allowed = false,
                 Ok = false
             };
         }
-        var deviceName = await _authenticator.RevokeAuthOrNull(request.Token.ToByteArray());
 
+        var session = await _account.RevokeSessionOrNull(request.Token.ToByteArray());
         return new RevokeTokenResponse
         {
-            Ok = true,
-            DeviceName = deviceName
+            Allowed = true,
+            Ok = session != null,
+            Os = session?.Os
         };
     }
 
-    public override async Task<AuthenticationResponse> Authenticate(AuthenticationRequest request, ServerCallContext context)
+    public override async Task<AuthenticationResponse> Authenticate(AuthenticationRequest request,
+        ServerCallContext context)
     {
         return new AuthenticationResponse
         {
-            Allowed = await _authenticator.GetUserIdFromToken(request.Token.ToByteArray()) != null
+            Allowed = await _account.GetUserIdFromToken(request.Token.ToByteArray()) != null
         };
     }
 
-    public override async Task AddUser(AddUserRequest request, IServerStreamWriter<AddUserResponse> responseStream, ServerCallContext context)
+    public override async Task GetSessions(GetRequest request, IServerStreamWriter<Session> responseStream,
+        ServerCallContext context)
     {
-        
+        var userId = await _account.GetUserIdFromToken(request.Token.ToByteArray());
+        if (userId == null)
+        {
+            return;
+        }
+
+        await foreach (var session in _account.GetSessions(userId.Value))
+        {
+            await responseStream.WriteAsync(session);
+        }
     }
 }

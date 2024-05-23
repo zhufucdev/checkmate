@@ -7,8 +7,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddGrpc();
 builder.Services.AddSingleton<IDatabaseService, PgsqlDatabaseService>();
-builder.Services.AddSingleton<IAuthenticatorService, DatabaseAuthenticatorService>();
+builder.Services.AddSingleton<IAccountService, DatabaseAccountService>();
 builder.Services.AddSingleton<ILibraryContinuityService, LibraryContinuityImpl>();
+builder.Services.AddSingleton<ITemporaryPasswordService, TemporaryPasswordService>();
 
 var app = builder.Build();
 

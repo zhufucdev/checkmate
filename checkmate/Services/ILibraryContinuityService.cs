@@ -8,4 +8,5 @@ public interface ILibraryContinuityService : IDisposable
     ContinuityStreamOwner<GetBorrowsResponse> Borrow { get; }
     ContinuityStreamOwner<GetBorrowBatchesResponse> BorrowBatch { get; }
     ContinuityStreamOwner<GetReadersResponse> Reader { get; }
+    ContinuityStreamOwner<GetUsersResponse> User { get; }
 }

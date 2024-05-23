@@ -32,4 +32,9 @@ public class LibraryContinuityImpl : ILibraryContinuityService
     {
         End = true
     });
+
+    public ContinuityStreamOwner<GetUsersResponse> User { get; } = new(new GetUsersResponse
+    {
+        End = true
+    });
 }

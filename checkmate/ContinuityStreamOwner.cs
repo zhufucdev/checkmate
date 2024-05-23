@@ -4,10 +4,10 @@ namespace checkmate;
 
 public class ContinuityStreamOwner<T> : IDisposable
 {
-    private readonly Dictionary<IServerStreamWriter<T>, SemaphoreSlim> _dict = new();
+    private readonly Dictionary<IServerStreamWriter<T>, AsyncMutex> _dict = new();
     public IReadOnlyCollection<IServerStreamWriter<T>> SuspendedWriters => _dict.Keys;
-    private readonly Timer _heartbeatTimer;
-    private readonly T _heartbeatPackage;
+    private readonly Timer? _heartbeatTimer;
+    private readonly T? _heartbeatPackage;
 
     public ContinuityStreamOwner(T heartbeatPackage)
     {
@@ -15,19 +15,24 @@ public class ContinuityStreamOwner<T> : IDisposable
         _heartbeatTimer = new Timer(_heartbeat, null, 0, 30000);
     }
 
+    public ContinuityStreamOwner()
+    {
+        _heartbeatTimer = null;
+        _heartbeatPackage = default;
+    }
+
     private void _heartbeat(object? _)
     {
-        WriteAsync(_heartbeatPackage);
+        var __ = WriteAsync(_heartbeatPackage!);
     }
 
     public async Task Hold(IServerStreamWriter<T> writer)
     {
-        using var mutex = new SemaphoreSlim(1, 1);
+        using var mutex = new AsyncMutex();
         _dict.Add(writer, mutex);
-        await mutex.WaitAsync();
-        await mutex.WaitAsync();
+        await mutex.Lock();
+        await mutex.ToRelease();
         _dict.Remove(writer);
-        mutex.Release();
     }
 
     public void Release(IServerStreamWriter<T> writer)
@@ -55,6 +60,6 @@ public class ContinuityStreamOwner<T> : IDisposable
             semaphore.Release();
         }
 
-        _heartbeatTimer.Dispose();
+        _heartbeatTimer?.Dispose();
     }
 }
