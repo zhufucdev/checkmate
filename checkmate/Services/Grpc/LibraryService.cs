@@ -732,7 +732,7 @@ public class LibraryService(
         while (true)
         {
             var sender = await accounts.GetUserOrNull(request.Password, request.DeviceName);
-            if (sender == null)
+            if (sender is not { Role: UserRole.RoleAdmin })
             {
                 await responseStream.WriteAsync(new AddUserResponse
                 {
@@ -794,15 +794,15 @@ public class LibraryService(
 
     public override async Task<UpdateResponse> UpdateUser(UpdateUserRequest request, ServerCallContext context)
     {
-        var adminId = await accounts.GetUserIdFromToken(request.Token.ToByteArray());
-        if (adminId == null)
+        var sender = await accounts.GetUserFromToken(request.Token.ToByteArray());
+        if (sender is not { Role: UserRole.RoleAdmin })
         {
             return new UpdateResponse
             {
                 Effect = UpdateEffect.EffectForbidden
             };
         }
-        
+
         if (request.User != null)
         {
             var found = await accounts.UpdateUser(request.UserId, request.User);
