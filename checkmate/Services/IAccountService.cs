@@ -15,6 +15,7 @@ public interface IAccountService
     Task<int> AddUser(UserCreator user);
     Task<bool> UpdateUser(int userId, User model);
     Task<bool> UpdatePassword(int userId, string password);
+    Task<bool> DeleteUser(int userId);
     Task<Session?> RevokeSessionOrNull(int sessionId);
     Task<Session?> GetSessionOrNull(int sessionId);
     IAsyncEnumerable<Session> GetSessions(int userId);

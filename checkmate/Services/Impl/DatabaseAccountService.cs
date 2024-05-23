@@ -154,6 +154,12 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
         return await cmd.ExecuteNonQueryAsync() > 0;
     }
 
+    public async Task<bool> DeleteUser(int userId)
+    {
+        await using var cmd = database.DataSource.CreateCommand("delete from users where id = $1");
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
     private Session _parseSession(DbDataReader reader)
     {
         var buf = new byte[IAccountService.DefaultTokenLength];
