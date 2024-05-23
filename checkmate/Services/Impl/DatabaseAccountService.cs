@@ -1,6 +1,8 @@
 using System.Data.Common;
 using System.Security.Cryptography;
+using checkmate.Models;
 using Sqlmaster.Protobuf;
+using Session = Sqlmaster.Protobuf.Session;
 
 namespace checkmate.Services.Impl;
 
@@ -79,7 +81,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
     {
         await using var cmd = database.DataSource.CreateCommand(
             """
-            select (id, device_name, role, reader_id)
+            select (users.id, device_name, role, reader_id)
             from users join auth on auth.user_id = users.id 
             where token = $1
             """);
@@ -107,7 +109,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
         return null;
     }
 
-    public async Task<int> AddUser(IAccountService.UserCreator user)
+    public async Task<int> AddUser(UserCreator user)
     {
         var hash = PasswordCrypto.Hash(user.Password);
         await using var makeUser = database.DataSource.CreateCommand(
@@ -152,19 +154,37 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
         return await cmd.ExecuteNonQueryAsync() > 0;
     }
 
-    public async Task<Session?> RevokeSessionOrNull(byte[] token)
+    private Models.Session _parseSession(DbDataReader reader)
+    {
+        var buf = new byte[IAccountService.DefaultTokenLength];
+        reader.GetBytes(1, 0, buf, 0, buf.Length);
+        return new Models.Session(reader.GetInt32(0), buf, reader.GetString(2), reader.GetInt32(3));
+    }
+
+    public async Task<Models.Session?> RevokeSessionOrNull(int sessionId)
     {
         await using var cmd =
             database.DataSource.CreateCommand(
-                "delete from users where $1 in (select token from users join auth on auth.user_id = users.id) returning (os, id)");
+                "delete from auth where id = $1 returning (id, token, os, user_id)");
+        cmd.Parameters.Add(database.CreateParameter(sessionId));
         await using var reader = await cmd.ExecuteReaderAsync();
         if (await reader.ReadAsync())
         {
-            return new Session
-            {
-                Os = reader.GetString(0),
-                Id = reader.GetInt32(1)
-            };
+            return _parseSession(reader);
+        }
+
+        return null;
+    }
+
+    public async Task<Models.Session?> GetSessionOrNull(int sessionId)
+    {
+        await using var cmd = database.DataSource.CreateCommand(
+            "select (id, token, os, user_id) from auth where id = $1");
+        cmd.Parameters.Add(database.CreateParameter(sessionId));
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            return _parseSession(reader);
         }
 
         return null;

@@ -1,6 +1,8 @@
+using checkmate.Models;
 using Google.Protobuf;
 using Grpc.Core;
 using Sqlmaster.Protobuf;
+using Session = Sqlmaster.Protobuf.Session;
 
 namespace checkmate.Services.Grpc;
 
@@ -24,7 +26,7 @@ public class AuthenticationService : Authentication.AuthenticationBase
         var anyUser = databaseService.DataSource.CreateCommand("select id from users").ExecuteScalar();
         if (anyUser != null) return;
         var pwdGen = creation.AddOneUsePassword();
-        pwdGen.Tag = new IAccountService.UserCreator(pwdGen.Value, null, UserRole.RoleAdmin, null);
+        pwdGen.Tag = new UserCreator(pwdGen.Value, null, UserRole.RoleAdmin, null);
         logger.LogWarning($"No user present in database. Temporary password generated: {pwdGen.Value}");
     }
 
@@ -37,8 +39,8 @@ public class AuthenticationService : Authentication.AuthenticationBase
             if (pwd != null)
             {
                 pwd.Invalidate();
-                var model = pwd.Tag as IAccountService.UserCreator;
-                userId = await _account.AddUser(new IAccountService.UserCreator(model?.Password ?? request.Password,
+                var model = pwd.Tag as UserCreator;
+                userId = await _account.AddUser(new UserCreator(model?.Password ?? request.Password,
                     model?.DeviceName ?? request.DeviceName, model?.Role ?? UserRole.RoleLibrarian, model?.ReaderId));
                 _logger.LogInformation(
                     $"New user ({request.DeviceName}) was created via access with temporary password.");
@@ -72,12 +74,31 @@ public class AuthenticationService : Authentication.AuthenticationBase
             };
         }
 
-        var session = await _account.RevokeSessionOrNull(request.Token.ToByteArray());
+        var session = await _account.GetSessionOrNull(request.SessionId);
+        if (session == null)
+        {
+            return new RevokeTokenResponse
+            {
+                Allowed = true,
+                Ok = false
+            };
+        }
+
+        if (session.UserId != id)
+        {
+            return new RevokeTokenResponse
+            {
+                Allowed = false,
+                Ok = false
+            };
+        }
+
+        await _account.RevokeSessionOrNull(session.Id);
         return new RevokeTokenResponse
         {
             Allowed = true,
-            Ok = session != null,
-            Os = session?.Os
+            Ok = true,
+            Os = session.Os
         };
     }
 

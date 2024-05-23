@@ -1,4 +1,6 @@
+using checkmate.Models;
 using Sqlmaster.Protobuf;
+using Session = Sqlmaster.Protobuf.Session;
 
 namespace checkmate.Services;
 
@@ -13,8 +15,9 @@ public interface IAccountService
     Task<int> AddUser(UserCreator user);
     Task<bool> UpdateUser(int userId, User model);
     Task<bool> UpdatePassword(int userId, string password);
-    Task<Session?> RevokeSessionOrNull(byte[] token);
+    Task<Models.Session?> RevokeSessionOrNull(int sessionId);
+    Task<Models.Session?> GetSessionOrNull(int sessionId);
     IAsyncEnumerable<Session> GetSessions(int userId);
 
-    public record UserCreator(string Password, string DeviceName, UserRole Role, Guid? ReaderId);
+    public const int DefaultTokenLength = 24;
 }
