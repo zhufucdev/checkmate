@@ -832,4 +832,21 @@ public class LibraryService(
             Effect = UpdateEffect.EffectOk
         };
     }
+
+    public override async Task<UpdateResponse> DeleteUser(DeleteUserRequest request, ServerCallContext context)
+    {
+        var sender = await accounts.GetUserOrNull(request.Password, request.DeviceName);
+        if (sender is not { Role: UserRole.RoleAdmin })
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        return new UpdateResponse
+        {
+            Effect = await accounts.DeleteUser(request.UserId) ? UpdateEffect.EffectOk : UpdateEffect.EffectNotFound
+        };
+    }
 }
