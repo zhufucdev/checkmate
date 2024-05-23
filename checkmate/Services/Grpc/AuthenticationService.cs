@@ -84,9 +84,11 @@ public class AuthenticationService : Authentication.AuthenticationBase
     public override async Task<AuthenticationResponse> Authenticate(AuthenticationRequest request,
         ServerCallContext context)
     {
+        var user = await _account.GetUserFromToken(request.Token.ToByteArray());
         return new AuthenticationResponse
         {
-            Allowed = await _account.GetUserIdFromToken(request.Token.ToByteArray()) != null
+            Allowed = user != null,
+            Role = user?.Role ?? UserRole.RoleUnspecific
         };
     }
 
