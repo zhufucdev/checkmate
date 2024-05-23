@@ -124,7 +124,11 @@ public class AuthenticationService : Authentication.AuthenticationBase
 
         await foreach (var session in _account.GetSessions(userId.Value))
         {
-            await responseStream.WriteAsync(session);
+            await responseStream.WriteAsync(new Session
+            {
+                Id = session.Id,
+                Os = session.Os
+            });
         }
     }
 }

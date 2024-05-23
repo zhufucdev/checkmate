@@ -2,7 +2,7 @@ using System.Data.Common;
 using System.Security.Cryptography;
 using checkmate.Models;
 using Sqlmaster.Protobuf;
-using Session = Sqlmaster.Protobuf.Session;
+using Session = checkmate.Models.Session;
 
 namespace checkmate.Services.Impl;
 
@@ -154,14 +154,14 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
         return await cmd.ExecuteNonQueryAsync() > 0;
     }
 
-    private Models.Session _parseSession(DbDataReader reader)
+    private Session _parseSession(DbDataReader reader)
     {
         var buf = new byte[IAccountService.DefaultTokenLength];
         reader.GetBytes(1, 0, buf, 0, buf.Length);
-        return new Models.Session(reader.GetInt32(0), buf, reader.GetString(2), reader.GetInt32(3));
+        return new Session(reader.GetInt32(0), buf, reader.GetString(2), reader.GetInt32(3));
     }
 
-    public async Task<Models.Session?> RevokeSessionOrNull(int sessionId)
+    public async Task<Session?> RevokeSessionOrNull(int sessionId)
     {
         await using var cmd =
             database.DataSource.CreateCommand(
@@ -176,7 +176,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
         return null;
     }
 
-    public async Task<Models.Session?> GetSessionOrNull(int sessionId)
+    public async Task<Session?> GetSessionOrNull(int sessionId)
     {
         await using var cmd = database.DataSource.CreateCommand(
             "select (id, token, os, user_id) from auth where id = $1");
@@ -193,16 +193,12 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
     public async IAsyncEnumerable<Session> GetSessions(int userId)
     {
         await using var cmd = database.DataSource.CreateCommand(
-            "select (os, id) from auth where user_id = $1");
+            "select (id, token, os, user_id) from auth where user_id = $1");
         cmd.Parameters.Add(database.CreateParameter(userId));
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            yield return new Session
-            {
-                Os = reader.GetString(0),
-                Id = reader.GetInt32(1)
-            };
+            yield return _parseSession(reader);
         }
     }
 }
