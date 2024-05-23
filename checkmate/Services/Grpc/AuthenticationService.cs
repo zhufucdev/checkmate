@@ -131,4 +131,14 @@ public class AuthenticationService : Authentication.AuthenticationBase
             });
         }
     }
+
+    public override async Task<GetUserResponse> GetUser(GetRequest request, ServerCallContext context)
+    {
+        var user = await _account.GetUserFromToken(request.Token.ToByteArray());
+        return new GetUserResponse
+        {
+            Allowed = user != null,
+            User = user
+        };
+    }
 }
