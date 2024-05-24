@@ -129,14 +129,15 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
         var auth = initBatch.CreateBatchCommand();
         auth.CommandText =
             """
-            create table if not exists auth
-            (
-                id      serial primary key,
-                token   bytea unique,
-                os      varchar,
-                user_id serial,
-                foreign key (user_id) references users (id) on delete cascade
-            )
+                create table if not exists auth
+                (
+                    id          serial primary key,
+                    token       bytea unique,
+                    os          varchar,
+                    user_id     serial,
+                    last_access timestamp default now(),
+                    foreign key (user_id) references users (id) on delete cascade
+                )
             """;
         initBatch.BatchCommands.Add(auth);
         initBatch.ExecuteNonQuery();

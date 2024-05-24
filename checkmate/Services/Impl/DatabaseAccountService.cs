@@ -50,12 +50,17 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            yield return new User
+            var user = new User
             {
                 DeviceName = reader.GetString(0),
                 Role = (UserRole)reader.GetInt16(1),
-                ReaderId = reader.GetGuid(2).ToString()
             };
+            if (!reader.IsDBNull(2))
+            {
+                user.ReaderId = reader.GetGuid(2).ToString();
+            }
+
+            yield return user;
         }
     }
 
@@ -75,8 +80,16 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
         return token;
     }
 
+    public async Task UpdateSessionAccessTime(byte[] token)
+    {
+        await using var cmd = database.DataSource.CreateCommand("update auth set last_access = now() where token = $1");
+        cmd.Parameters.Add(database.CreateParameter(token));
+        await cmd.ExecuteNonQueryAsync();
+    }
+
     public async Task<int?> GetUserIdFromToken(byte[] token)
     {
+        await UpdateSessionAccessTime(token);
         await using var cmd = database.DataSource.CreateCommand("select user_id from auth where token = $1");
         cmd.Parameters.Add(database.CreateParameter(token));
         return (int?)await cmd.ExecuteScalarAsync();
@@ -84,6 +97,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
 
     public async Task<User?> GetUserFromToken(byte[] token)
     {
+        await UpdateSessionAccessTime(token);
         await using var cmd = database.DataSource.CreateCommand(
             """
             select users.id, device_name, role, reader_id
