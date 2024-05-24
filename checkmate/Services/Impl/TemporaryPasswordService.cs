@@ -6,14 +6,16 @@ public class TemporaryPasswordService : ITemporaryPasswordService
 {
     public ICollection<ITemporaryPasswordService.ITemporaryPassword> TemporaryPasswords { get; } = [];
 
-    private class TimedTemporaryPassword : ITemporaryPasswordService.ITimedTemporaryPassword {
+    private class TimedTemporaryPassword : ITemporaryPasswordService.ITimedTemporaryPassword
+    {
         private const string OctalNumbers = "0123456789";
 
         public string Value { get; }
         public int LifeSpanSeconds { get; }
-        
+
         private readonly TemporaryPasswordService _parent;
         private readonly AsyncMutex _mutex = new();
+        private readonly Timer _timer;
 
         public TimedTemporaryPassword(TemporaryPasswordService parent, int lifespan = 45, int length = 8)
         {
@@ -21,6 +23,7 @@ public class TemporaryPasswordService : ITemporaryPasswordService
             LifeSpanSeconds = lifespan;
             _parent = parent;
             _ = _mutex.Lock();
+            _timer = new Timer(_ => Invalidate(), null, TimeSpan.FromSeconds(lifespan), Timeout.InfiniteTimeSpan);
         }
 
         private readonly DateTime _createTime = DateTime.Now;
@@ -36,6 +39,7 @@ public class TemporaryPasswordService : ITemporaryPasswordService
             _parent.TemporaryPasswords.Remove(this);
             _invalidated = true;
             _mutex.Release();
+            _timer.Dispose();
         }
 
         public async Task ToBeInvalid()
