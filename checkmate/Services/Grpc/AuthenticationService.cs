@@ -106,10 +106,18 @@ public class AuthenticationService : Authentication.AuthenticationBase
         ServerCallContext context)
     {
         var user = await _account.GetUserFromToken(request.Token.ToByteArray());
+        if (user == null || user.DeviceName != request.DeviceName)
+        {
+            return new AuthenticationResponse
+            {
+                Allowed = false,
+                Role = UserRole.RoleUnspecific
+            };
+        }
         return new AuthenticationResponse
         {
-            Allowed = user != null,
-            Role = user?.Role ?? UserRole.RoleUnspecific
+            Allowed = true,
+            Role = user.Role
         };
     }
 
