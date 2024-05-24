@@ -141,4 +141,30 @@ public class AuthenticationService : Authentication.AuthenticationBase
             User = user
         };
     }
+
+    public override async Task<UpdateResponse> ChangePassword(ChangePasswordRequest request, ServerCallContext context)
+    {
+        var user = await _account.GetUserFromToken(request.Token.ToByteArray());
+        if (user == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectNotFound
+            };
+        }
+        user = await _account.GetUserOrNull(request.Password, user.DeviceName);
+        if (user == null)
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
+        }
+
+        var found = await _account.UpdatePassword(user.Id, request.NewPassword);
+        return new UpdateResponse
+        {
+            Effect = found ? UpdateEffect.EffectOk : UpdateEffect.EffectNotFound
+        };
+    }
 }
