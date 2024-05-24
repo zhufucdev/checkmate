@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Data.Common;
+using checkmate.Models;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Sqlmaster.Protobuf;
@@ -742,7 +743,8 @@ public class LibraryService(
             }
 
             var password = creation.AddTimedPassword(lifeSpanSeconds: TimedPasswordLife);
-            password.Tag = request.Role;
+            password.Tag = new UserCreator(password.Value, request.DeviceName, UserRole.RoleAdmin,
+                request.ReaderId.Length > 0 ? Guid.Parse(request.ReaderId) : null);
             try
             {
                 await responseStream.WriteAsync(new AddUserResponse
