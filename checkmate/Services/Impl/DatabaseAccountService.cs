@@ -119,8 +119,8 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
         var hash = PasswordCrypto.Hash(user.Password);
         await using var makeUser = database.DataSource.CreateCommand(
             """
-            insert into users(id, device_name, password_hash, role, reader_id)
-            values (1, $1, $2, $3, $4)
+            insert into users(device_name, password_hash, role, reader_id)
+            values ($1, $2, $3, $4)
             returning id
             """
         );
