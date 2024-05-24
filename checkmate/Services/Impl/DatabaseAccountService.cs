@@ -183,14 +183,14 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
     {
         var buf = new byte[IAccountService.DefaultTokenLength];
         reader.GetBytes(1, 0, buf, 0, buf.Length);
-        return new Session(reader.GetInt32(0), buf, reader.GetString(2), reader.GetInt32(3));
+        return new Session(reader.GetInt32(0), buf, reader.GetString(2), reader.GetInt32(3), reader.GetDateTime(4));
     }
 
     public async Task<Session?> RevokeSessionOrNull(int sessionId)
     {
         await using var cmd =
             database.DataSource.CreateCommand(
-                "delete from auth where id = $1 returning (id, token, os, user_id)");
+                "delete from auth where id = $1 returning id, token, os, user_id, last_access");
         cmd.Parameters.Add(database.CreateParameter(sessionId));
         await using var reader = await cmd.ExecuteReaderAsync();
         if (await reader.ReadAsync())
@@ -204,7 +204,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
     public async Task<Session?> GetSessionOrNull(int sessionId)
     {
         await using var cmd = database.DataSource.CreateCommand(
-            "select id, token, os, user_id from auth where id = $1");
+            "select id, token, os, user_id, last_access from auth where id = $1");
         cmd.Parameters.Add(database.CreateParameter(sessionId));
         await using var reader = await cmd.ExecuteReaderAsync();
         if (await reader.ReadAsync())
@@ -218,12 +218,26 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
     public async IAsyncEnumerable<Session> GetSessions(int userId)
     {
         await using var cmd = database.DataSource.CreateCommand(
-            "select id, token, os, user_id from auth where user_id = $1");
+            "select id, token, os, user_id, last_access from auth where user_id = $1");
         cmd.Parameters.Add(database.CreateParameter(userId));
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
             yield return _parseSession(reader);
         }
+    }
+
+    public async Task<Session?> GetSessionFromToken(byte[] token)
+    {
+        await using var cmd = database.DataSource.CreateCommand(
+            "select id, token, os, user_id, last_access from auth where token = $1");
+        cmd.Parameters.Add(database.CreateParameter(token));
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            return _parseSession(reader);
+        }
+
+        return null;
     }
 }

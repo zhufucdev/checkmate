@@ -19,6 +19,7 @@ public interface IAccountService
     Task<Session?> RevokeSessionOrNull(int sessionId);
     Task<Session?> GetSessionOrNull(int sessionId);
     IAsyncEnumerable<Session> GetSessions(int userId);
+    Task<Session?> GetSessionFromToken(byte[] token);
 
     public const int DefaultTokenLength = 24;
 }

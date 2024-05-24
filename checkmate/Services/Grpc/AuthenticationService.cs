@@ -1,5 +1,6 @@
 using checkmate.Models;
 using Google.Protobuf;
+using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Sqlmaster.Protobuf;
 using Session = Sqlmaster.Protobuf.Session;
@@ -135,7 +136,8 @@ public class AuthenticationService : Authentication.AuthenticationBase
             await responseStream.WriteAsync(new Session
             {
                 Id = session.Id,
-                Os = session.Os
+                Os = session.Os,
+                LastAccess = Timestamp.FromDateTime(session.LastAccess.ToUniversalTime())
             });
         }
     }
@@ -143,11 +145,23 @@ public class AuthenticationService : Authentication.AuthenticationBase
     public override async Task<GetUserResponse> GetUser(GetRequest request, ServerCallContext context)
     {
         var user = await _account.GetUserFromToken(request.Token.ToByteArray());
-        return new GetUserResponse
+        var session = await _account.GetSessionFromToken(request.Token.ToByteArray());
+        var res = new GetUserResponse
         {
             Allowed = user != null,
-            User = user
+            User = user,
         };
+        if (session != null)
+        {
+            res.Session = new Session
+            {
+                Id = session.Id,
+                Os = session.Os,
+                LastAccess = Timestamp.FromDateTime(session.LastAccess.ToUniversalTime())
+            };
+        }
+
+        return res;
     }
 
     public override async Task<UpdateResponse> ChangePassword(ChangePasswordRequest request, ServerCallContext context)
