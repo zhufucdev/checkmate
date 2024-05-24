@@ -10,13 +10,18 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
 {
     private static User _parseUser(DbDataReader reader)
     {
-        return new User
+        var user = new User
         {
             Id = reader.GetInt32(0),
             DeviceName = reader.GetString(1),
             Role = (UserRole)reader.GetInt16(2),
-            ReaderId = reader.GetGuid(3).ToString()
         };
+        if (!reader.IsDBNull(3))
+        {
+            user.ReaderId = reader.GetGuid(3).ToString();
+        }
+
+        return user;
     }
 
     public async Task<User?> GetUserOrNull(string password, string deviceName)
@@ -25,7 +30,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
         await using var cmd =
             database.DataSource.CreateCommand(
                 """
-                select (id, device_name, role, reader_id) from users
+                select id, device_name, role, reader_id from users
                 where password_hash = $1 and device_name = $2
                 """);
         cmd.Parameters.Add(database.CreateParameter(passwordHash));
@@ -41,7 +46,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
 
     public async IAsyncEnumerable<User> GetUsers()
     {
-        await using var cmd = database.DataSource.CreateCommand("select (device_name, role, reader_id) from users");
+        await using var cmd = database.DataSource.CreateCommand("select device_name, role, reader_id from users");
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
@@ -81,7 +86,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
     {
         await using var cmd = database.DataSource.CreateCommand(
             """
-            select (users.id, device_name, role, reader_id)
+            select users.id, device_name, role, reader_id
             from users join auth on auth.user_id = users.id 
             where token = $1
             """);
@@ -98,7 +103,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
     public async Task<User?> GetUserOrNull(int userId)
     {
         await using var cmd =
-            database.DataSource.CreateCommand("select (id, device_name, role, reader_id) from users where id = $1");
+            database.DataSource.CreateCommand("select id, device_name, role, reader_id from users where id = $1");
         cmd.Parameters.Add(database.CreateParameter(userId));
         await using var reader = await cmd.ExecuteReaderAsync();
         if (await reader.ReadAsync())
@@ -185,7 +190,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
     public async Task<Session?> GetSessionOrNull(int sessionId)
     {
         await using var cmd = database.DataSource.CreateCommand(
-            "select (id, token, os, user_id) from auth where id = $1");
+            "select id, token, os, user_id from auth where id = $1");
         cmd.Parameters.Add(database.CreateParameter(sessionId));
         await using var reader = await cmd.ExecuteReaderAsync();
         if (await reader.ReadAsync())
@@ -199,7 +204,7 @@ public class DatabaseAccountService(IDatabaseService database) : IAccountService
     public async IAsyncEnumerable<Session> GetSessions(int userId)
     {
         await using var cmd = database.DataSource.CreateCommand(
-            "select (id, token, os, user_id) from auth where user_id = $1");
+            "select id, token, os, user_id from auth where user_id = $1");
         cmd.Parameters.Add(database.CreateParameter(userId));
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
