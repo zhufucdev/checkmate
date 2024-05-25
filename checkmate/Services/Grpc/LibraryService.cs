@@ -743,7 +743,7 @@ public class LibraryService(
             }
 
             var password = creation.AddTimedPassword(lifeSpanSeconds: TimedPasswordLife);
-            password.Tag = new UserCreator(password.Value, null, UserRole.RoleAdmin,
+            password.Tag = new UserCreator(password.Value, null, request.Role,
                 request.ReaderId.Length > 0 ? Guid.Parse(request.ReaderId) : null);
             try
             {
