@@ -33,7 +33,8 @@ public class AuthenticationService : Authentication.AuthenticationBase
 
     public override async Task<AuthorizationResponse> Authorize(AuthorizationRequest request, ServerCallContext context)
     {
-        var userId = (await _account.GetUserOrNull(request.Password, request.DeviceName))?.Id;
+        var user = await _account.GetUserOrNull(request.Password, request.DeviceName);
+        var userId = user?.Id;
         if (userId == null)
         {
             var pwd = _creation.GetValidPassword(request.Password);
@@ -59,7 +60,8 @@ public class AuthenticationService : Authentication.AuthenticationBase
         return new AuthorizationResponse
         {
             Allowed = true,
-            Token = ByteString.CopyFrom(token)
+            Token = ByteString.CopyFrom(token),
+            Role = user!.Role
         };
     }
 
