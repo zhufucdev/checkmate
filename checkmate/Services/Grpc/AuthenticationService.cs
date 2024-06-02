@@ -34,6 +34,7 @@ public class AuthenticationService : Authentication.AuthenticationBase
     public override async Task<AuthorizationResponse> Authorize(AuthorizationRequest request, ServerCallContext context)
     {
         var user = await _account.GetUserOrNull(request.Password, request.DeviceName);
+        var role = user?.Role ?? UserRole.RoleUnspecific;
         var userId = user?.Id;
         if (userId == null)
         {
@@ -44,6 +45,7 @@ public class AuthenticationService : Authentication.AuthenticationBase
                 var model = pwd.Tag as UserCreator;
                 userId = await _account.AddUser(new UserCreator(model?.Password ?? request.Password,
                     model?.DeviceName ?? request.DeviceName, model?.Role ?? UserRole.RoleLibrarian, model?.ReaderId));
+                role = model?.Role ?? UserRole.RoleLibrarian;
                 _logger.LogInformation(
                     $"New user ({request.DeviceName}) was created via access with temporary password.");
             }
@@ -61,7 +63,7 @@ public class AuthenticationService : Authentication.AuthenticationBase
         {
             Allowed = true,
             Token = ByteString.CopyFrom(token),
-            Role = user!.Role
+            Role = role
         };
     }
 
