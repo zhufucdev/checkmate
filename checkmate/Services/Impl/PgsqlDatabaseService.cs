@@ -59,7 +59,7 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
                 author     varchar,
                 isbn       varchar,
                 avatar_uri varchar,
-                stock      integer
+                stock      integer not null check ( stock > 0 )
             )
             """;
         var reader = initBatch.CreateBatchCommand();
