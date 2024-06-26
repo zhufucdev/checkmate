@@ -3,6 +3,7 @@ using System.Data.Common;
 using checkmate.Models;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
+using Npgsql;
 using Sqlmaster.Protobuf;
 
 namespace checkmate.Services.Grpc;
@@ -412,6 +413,32 @@ public class LibraryService(
         };
     }
 
+    private async Task<bool> _canBorrow(Guid bookId)
+    {
+        var bookIdParameter = db.CreateParameter(bookId);
+        await using var cmd = db.DataSource.CreateCommand(
+            """
+            select (select count(*) from borrows where book_id = $1) +
+                   (select count(*)
+                    from borrow_batches as batch
+                             join book_borrow_batches as relation on batch.id = relation.batch_id
+                    where relation.book_id = $1)
+
+            """
+        );
+        cmd.Parameters.Add(bookIdParameter);
+
+        bookIdParameter = db.CreateParameter(bookId);
+        var borrowedOut = (long)(await cmd.ExecuteScalarAsync())!;
+        await using var query = db.DataSource.CreateCommand(
+            "select stock from books where id = $1"
+        );
+        query.Parameters.Add(bookIdParameter);
+        var stock = (int)(await query.ExecuteScalarAsync())!;
+
+        return stock > borrowedOut;
+    }
+
     public override async Task<UpdateResponse> AddBorrow(AddRequest request, ServerCallContext context)
     {
         if (await accounts.GetUserIdFromToken(request.Token.ToByteArray()) == null)
@@ -426,6 +453,14 @@ public class LibraryService(
         if (borrow == null)
         {
             throw new ArgumentNullException("borrow");
+        }
+
+        if (!await _canBorrow(Guid.Parse(borrow.BookId)))
+        {
+            return new UpdateResponse
+            {
+                Effect = UpdateEffect.EffectForbidden
+            };
         }
 
         await using var cmd = db.DataSource.CreateCommand(
@@ -647,6 +682,18 @@ public class LibraryService(
         if (batch == null)
         {
             throw new ArgumentNullException("batch");
+        }
+
+        foreach (var batchBookId in batch.BookIds)
+        {
+            var book = Guid.Parse(batchBookId);
+            if (!await _canBorrow(book))
+            {
+                return new UpdateResponse
+                {
+                    Effect = UpdateEffect.EffectForbidden
+                };
+            }
         }
 
         await using var cmd = db.DataSource.CreateCommand(
