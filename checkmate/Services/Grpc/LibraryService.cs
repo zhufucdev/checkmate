@@ -3,7 +3,6 @@ using System.Data.Common;
 using checkmate.Models;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
-using Npgsql;
 using Sqlmaster.Protobuf;
 
 namespace checkmate.Services.Grpc;
@@ -418,11 +417,11 @@ public class LibraryService(
         var bookIdParameter = db.CreateParameter(bookId);
         await using var cmd = db.DataSource.CreateCommand(
             """
-            select (select count(*) from borrows where book_id = $1) +
+            select (select count(*) from borrows where book_id = $1 and return_time is null) +
                    (select count(*)
                     from borrow_batches as batch
                              join book_borrow_batches as relation on batch.id = relation.batch_id
-                    where relation.book_id = $1)
+                    where relation.book_id = $1 and return_time is null)
 
             """
         );
