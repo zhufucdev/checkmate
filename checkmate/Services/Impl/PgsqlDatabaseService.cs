@@ -52,13 +52,14 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
         initBatch.BatchCommands.Add(books);
         books.CommandText =
             """
-            create table if not exists books(
-                id uuid primary key default gen_random_uuid(),
-                name varchar,
-                author varchar,
-                isbn varchar,
+            create table if not exists books
+            (
+                id         uuid primary key default gen_random_uuid(),
+                name       varchar not null,
+                author     varchar,
+                isbn       varchar,
                 avatar_uri varchar,
-                stock integer
+                stock      integer
             )
             """;
         var reader = initBatch.CreateBatchCommand();
@@ -67,10 +68,10 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
             create table if not exists readers
             (
                 id            uuid primary key default gen_random_uuid(),
-                name          varchar,
+                name          varchar not null,
                 avatar_uri    varchar,
-                tier          smallint,
-                creditability float
+                tier          smallint not null,
+                creditability float not null
             )
             """;
         initBatch.BatchCommands.Add(reader);
@@ -80,10 +81,10 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
             create table if not exists borrows
             (
                 id          uuid primary key default gen_random_uuid(),
-                reader_id   uuid,
-                book_id     uuid,
-                borrow_time timestamp,
-                due_time    timestamp,
+                reader_id   uuid not null,
+                book_id     uuid not null,
+                borrow_time timestamp not null,
+                due_time    timestamp not null,
                 return_time timestamp
             )
             """;
@@ -94,9 +95,9 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
             create table if not exists borrow_batches
             (
                 id          uuid primary key default gen_random_uuid(),
-                reader_id   uuid,
-                borrow_time timestamp,
-                due_time    timestamp,
+                reader_id   uuid not null,
+                borrow_time timestamp not null,
+                due_time    timestamp not null,
                 return_time timestamp
             )
             """;
@@ -106,8 +107,8 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
             """
             create table if not exists book_borrow_batches
             (
-                batch_id uuid,
-                book_id  uuid,
+                batch_id uuid not null,
+                book_id  uuid not null,
                 primary key (batch_id, book_id),
                 foreign key (batch_id) references borrow_batches (id) on delete cascade
             )
@@ -119,9 +120,9 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
             create table if not exists users
             (
                 id            serial primary key,
-                device_name   varchar unique,
+                device_name   varchar unique not null,
                 password_hash bytea,
-                role          smallint,
+                role          smallint not null,
                 reader_id     uuid references readers (id) on delete set null
             )
             """;
@@ -132,9 +133,9 @@ public class PgsqlDatabaseService : IDatabaseService, IAsyncDisposable
                 create table if not exists auth
                 (
                     id          serial primary key,
-                    token       bytea unique,
-                    os          varchar,
-                    user_id     serial,
+                    token       bytea unique not null,
+                    os          varchar not null,
+                    user_id     serial not null,
                     last_access timestamp default now(),
                     foreign key (user_id) references users (id) on delete cascade
                 )
